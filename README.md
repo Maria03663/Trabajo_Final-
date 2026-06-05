@@ -1,5 +1,7 @@
 # Graficadora de Funciones Lineales
 
+![Vista previa](preview.svg)
+
 Una página web interactiva para visualizar funciones lineales de la forma **y = m·x + b**.
 
 Ajusta la pendiente (m) y la intersección con el eje Y (b) para ver cómo cambia la recta en tiempo real.
