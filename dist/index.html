@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classifica — Regresión Logística</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-CccBxxCi.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BKVp7Tzy.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="header" id="header">
+      <div class="logo">
+        <span class="logo-icon">&#9670;</span>
+        <h1 class="title">Classifica</h1>
+      </div>
+      <p class="subtitle">Regresi&oacute;n Log&iacute;stica &middot; Entrenamiento, Evaluaci&oacute;n y Predicci&oacute;n</p>
+    </header>
+
+    <section class="control-bar" id="controlBar">
+      <div class="control-group">
+        <label for="datasetSelect">Dataset</label>
+        <select id="datasetSelect">
+          <option value="synthetic">Sint&eacute;tico 2D</option>
+          <option value="iris">Iris (Setosa vs Versicolor)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="trainSplit">Train <span id="trainSplitLabel">80</span>%</label>
+        <input type="range" id="trainSplit" min="50" max="90" value="80" step="5">
+      </div>
+      <div class="control-group">
+        <label for="learningRate">&alpha; <span id="lrLabel">0.1</span></label>
+        <input type="range" id="learningRate" min="1" max="50" value="10" step="1">
+      </div>
+      <div class="control-group">
+        <label for="epochs">&Eacute;pocas</label>
+        <input type="number" id="epochs" value="500" min="50" max="5000" step="50">
+      </div>
+      <button class="btn btn-train" id="trainBtn" data-label="Entrenar modelo">
+        <span class="btn-icon">&#9654;</span>
+        <span class="btn-text">Entrenar</span>
+      </button>
+      <button class="btn btn-reset" id="resetBtn" disabled>
+        <span class="btn-icon">&#8635;</span>
+      </button>
+    </section>
+
+    <section class="sample-info" id="sampleInfo">
+      <span id="sampleCount">Muestras: 0</span>
+      <span class="info-divider-v"></span>
+      <span id="featureCount">Features: 2</span>
+      <span class="info-divider-v"></span>
+      <span class="class-legend">
+        <span class="legend-dot dot-0"></span> Clase 0
+        <span class="legend-dot dot-1"></span> Clase 1
+      </span>
+    </section>
+
+    <div class="main-grid">
+      <section class="panel panel-boundary" id="panelBoundary">
+        <div class="panel-header">
+          <h2>Frontera de Decisi&oacute;n</h2>
+          <span class="panel-badge" id="epochBadge">0 &eacute;pocas</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="boundaryCanvas" width="500" height="400"></canvas>
+          <div class="canvas-overlay" id="trainingOverlay">
+            <div class="spinner"></div>
+            <span>Entrenando...</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-cost" id="panelCost">
+        <div class="panel-header">
+          <h2>Costo de Entrenamiento</h2>
+          <span class="panel-badge" id="costBadge">Costo: —</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="costCanvas" width="500" height="300"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel panel-metrics" id="panelMetrics" style="display:none">
+      <div class="panel-header">
+        <h2>M&eacute;tricas de Evaluaci&oacute;n</h2>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value" id="metricAccuracy">—</div>
+          <div class="metric-label">Accuracy</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="metricPrecision">—</div>
+          <div class="metric-label">Precision</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="metricRecall">—</div>
+          <div class="metric-label">Recall</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="metricF1">—</div>
+          <div class="metric-label">F1-Score</div>
+        </div>
+      </div>
+      <div class="metrics-detail">
+        <div class="confusion-matrix" id="confusionMatrix">
+          <h3>Matriz de Confusi&oacute;n</h3>
+          <div class="cm-grid">
+            <div></div>
+            <div class="cm-header">Pred 0</div>
+            <div class="cm-header">Pred 1</div>
+            <div class="cm-header">Real 0</div>
+            <div class="cm-cell tn" id="cmTN">0</div>
+            <div class="cm-cell fp" id="cmFP">0</div>
+            <div class="cm-header">Real 1</div>
+            <div class="cm-cell fn" id="cmFN">0</div>
+            <div class="cm-cell tp" id="cmTP">0</div>
+          </div>
+        </div>
+        <div class="coefficients" id="coeffPanel">
+          <h3>Coeficientes del Modelo</h3>
+          <div class="coeff-formula" id="coeffFormula">y = &beta;&#8320; + &beta;&#8321;x&#8321; + &beta;&#8322;x&#8322;</div>
+          <div class="coeff-list" id="coeffList">
+            <div class="coeff-item"><span class="coeff-name">&beta;&#8320; (bias)</span><span class="coeff-val" id="coefBias">—</span></div>
+            <div class="coeff-item"><span class="coeff-name">&beta;&#8321;</span><span class="coeff-val" id="coefW1">—</span></div>
+            <div class="coeff-item"><span class="coeff-name">&beta;&#8322;</span><span class="coeff-val" id="coefW2">—</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel panel-predict" id="panelPredict" style="display:none">
+      <div class="panel-header">
+        <h2>Predecir Nuevos Datos</h2>
+      </div>
+      <div class="predict-form">
+        <div class="predict-inputs">
+          <div class="control-group">
+            <label for="predF1">x&#8321;</label>
+            <input type="number" id="predF1" step="0.1" placeholder="0.0">
+          </div>
+          <div class="control-group">
+            <label for="predF2">x&#8322;</label>
+            <input type="number" id="predF2" step="0.1" placeholder="0.0">
+          </div>
+          <button class="btn btn-predict" id="predictBtn">
+            <span class="btn-icon">&#9654;</span>
+            <span class="btn-text">Predecir</span>
+          </button>
+        </div>
+        <div class="predict-result" id="predictResult">
+          <div class="result-placeholder">Ajust&aacute; los valores y presion&aacute; Predecir</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Classifica &mdash; Proyecto educativo &middot; Regresi&oacute;n Log&iacute;stica desde cero</p>
+    </footer>
+  </div>
+
+</body>
+</html>
