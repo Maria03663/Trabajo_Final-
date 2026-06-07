@@ -4,296 +4,52 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Graficadora de Funciones Lineales</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f0f4f8;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-      padding: 30px;
-      max-width: 800px;
-      width: 100%;
-    }
-    h1 {
-      text-align: center;
-      color: #1a202c;
-      font-size: 1.8rem;
-      margin-bottom: 4px;
-    }
-    .subtitle {
-      text-align: center;
-      color: #718096;
-      margin-bottom: 24px;
-      font-size: 0.95rem;
-    }
-    .controls {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #f7fafc;
-      padding: 8px 14px;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-    }
-    .control-group label {
-      font-weight: 600;
-      color: #2d3748;
-      font-size: 0.95rem;
-    }
-    .control-group input {
-      width: 70px;
-      padding: 6px 8px;
-      border: 1px solid #cbd5e0;
-      border-radius: 6px;
-      font-size: 1rem;
-      text-align: center;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .control-group input:focus {
-      border-color: #4299e1;
-      box-shadow: 0 0 0 2px rgba(66,153,225,0.2);
-    }
-    .control-group input[type="color"] {
-      width: 40px;
-      height: 36px;
-      padding: 2px;
-      cursor: pointer;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto 20px;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      background: #fdfdfd;
-      width: 100%;
-      max-width: 700px;
-      cursor: crosshair;
-    }
-    .info {
-      background: #ebf8ff;
-      border-left: 4px solid #4299e1;
-      padding: 14px 18px;
-      border-radius: 8px;
-      color: #2b6cb0;
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-    .info strong { color: #1a365d; }
-    .info .formula {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: #1a365d;
-    }
-    .info-row {
-      display: flex;
-      justify-content: center;
-      gap: 30px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-    .info-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .info-item .dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 4px;
-      display: inline-block;
-    }
-    @media (max-width: 600px) {
-      .container { padding: 16px; }
-      .controls { flex-direction: column; align-items: stretch; }
-      .control-group { justify-content: space-between; }
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-<div class="container">
-  <img src="preview.svg" alt="Vista previa de la graficadora" style="width:100%; max-width:700px; display:block; margin:0 auto 20px; border-radius:12px;">
-  <h1> Graficadora Lineal</h1>
-  <p class="subtitle">y = m·x + b — Ajusta los parámetros y observa la recta</p>
+  <div class="app" id="app">
+    <header class="header" id="header">
+      <h1 class="title">Graficadora Lineal</h1>
+      <p class="subtitle"><span class="math">y = m&middot;x + b</span> &mdash; Visualiz&aacute; la recta</p>
+    </header>
 
-  <div class="controls">
-    <div class="control-group">
-      <label>m (pendiente)</label>
-      <input type="number" id="slope" value="1" step="0.1">
-    </div>
-    <div class="control-group">
-      <label>b (intersección)</label>
-      <input type="number" id="intercept" value="0" step="0.1">
-    </div>
-    <div class="control-group">
-      <label>Color</label>
-      <input type="color" id="lineColor" value="#e53e3e">
-    </div>
+    <section class="controls" id="controls">
+      <div class="control-group">
+        <label for="slope">m <span class="label-desc">pendiente</span></label>
+        <input type="number" id="slope" value="1" step="0.1">
+      </div>
+      <div class="control-group">
+        <label for="intercept">b <span class="label-desc">intersecci&oacute;n</span></label>
+        <input type="number" id="intercept" value="0" step="0.1">
+      </div>
+      <div class="control-group color-group">
+        <label for="lineColor">Color</label>
+        <input type="color" id="lineColor" value="#e53e3e">
+      </div>
+    </section>
+
+    <section class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="canvas" width="700" height="500"></canvas>
+    </section>
+
+    <footer class="info" id="info">
+      <div class="formula" id="formulaDisplay">y = 1.00x + 0.00</div>
+      <div class="info-row">
+        <span class="info-item">Pendiente (m): <strong id="mDisplay">1.00</strong></span>
+        <span class="info-divider"></span>
+        <span class="info-item">Ordenada (b): <strong id="bDisplay">0.00</strong></span>
+        <span class="info-divider"></span>
+        <span class="info-item">
+          <span class="color-dot" id="colorDot" style="background:#e53e3e"></span>
+          Coord: <strong id="coordDisplay">(0, 0)</strong>
+        </span>
+      </div>
+    </footer>
   </div>
 
-  <canvas id="canvas" width="700" height="500"></canvas>
-
-  <div class="info">
-    <div style="text-align:center;" class="formula" id="formulaDisplay">y = 1.00x + 0.00</div>
-    <div class="info-row">
-      <span class="info-item"> Pendiente (m): <strong id="mDisplay">1.00</strong></span>
-      <span class="info-item"> Intersección Y: <strong id="bDisplay">0.00</strong></span>
-      <span class="info-item"><span class="dot" id="colorDot" style="background:#e53e3e"></span> <span id="coordDisplay">(0, 0)</span></span>
-    </div>
-  </div>
-</div>
-
-<script>
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-
-  const slopeInput = document.getElementById('slope');
-  const interceptInput = document.getElementById('intercept');
-  const colorInput = document.getElementById('lineColor');
-
-  const formulaDisplay = document.getElementById('formulaDisplay');
-  const mDisplay = document.getElementById('mDisplay');
-  const bDisplay = document.getElementById('bDisplay');
-  const coordDisplay = document.getElementById('coordDisplay');
-  const colorDot = document.getElementById('colorDot');
-
-  const W = canvas.width;
-  const H = canvas.height;
-  const pad = 40;
-
-  const xMin = -10, xMax = 10, yMin = -10, yMax = 10;
-  const scaleX = (W - 2 * pad) / (xMax - xMin);
-  const scaleY = (H - 2 * pad) / (yMax - yMin);
-
-  function toCanvasX(x) { return pad + (x - xMin) * scaleX; }
-  function toCanvasY(y) { return H - pad - (y - yMin) * scaleY; }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    const color = colorInput.value;
-    const m = parseFloat(slopeInput.value) || 0;
-    const b = parseFloat(interceptInput.value) || 0;
-
-    // Grid
-    ctx.strokeStyle = '#edf2f7';
-    ctx.lineWidth = 1;
-    for (let x = Math.ceil(xMin); x <= xMax; x++) {
-      ctx.beginPath();
-      ctx.moveTo(toCanvasX(x), pad);
-      ctx.lineTo(toCanvasX(x), H - pad);
-      ctx.stroke();
-    }
-    for (let y = Math.ceil(yMin); y <= yMax; y++) {
-      ctx.beginPath();
-      ctx.moveTo(pad, toCanvasY(y));
-      ctx.lineTo(W - pad, toCanvasY(y));
-      ctx.stroke();
-    }
-
-    // Axes
-    ctx.strokeStyle = '#a0aec0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(pad, toCanvasY(0));
-    ctx.lineTo(W - pad, toCanvasY(0));
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(toCanvasX(0), pad);
-    ctx.lineTo(toCanvasX(0), H - pad);
-    ctx.stroke();
-
-    // Axis labels
-    ctx.fillStyle = '#718096';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'center';
-    for (let x = Math.ceil(xMin); x <= xMax; x++) {
-      if (x === 0) continue;
-      ctx.fillText(x, toCanvasX(x), toCanvasY(0) + 16);
-    }
-    ctx.textAlign = 'right';
-    for (let y = Math.ceil(yMin); y <= yMax; y++) {
-      if (y === 0) continue;
-      ctx.fillText(y, toCanvasX(0) - 8, toCanvasY(y) + 4);
-    }
-    ctx.textAlign = 'center';
-    ctx.fillText('x', W - pad + 14, toCanvasY(0) + 4);
-    ctx.fillText('y', toCanvasX(0) - 14, pad - 6);
-
-    // Origin
-    ctx.fillStyle = '#718096';
-    ctx.textAlign = 'right';
-    ctx.fillText('O', toCanvasX(0) - 6, toCanvasY(0) + 14);
-
-    // Line
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    const x1 = xMin, y1 = m * x1 + b;
-    const x2 = xMax, y2 = m * x2 + b;
-    if (isFinite(y1) && isFinite(y2)) {
-      ctx.moveTo(toCanvasX(x1), toCanvasY(y1));
-      ctx.lineTo(toCanvasX(x2), toCanvasY(y2));
-      ctx.stroke();
-    }
-
-    // Highlight intercept
-    const bCanvasY = toCanvasY(b);
-    if (b >= yMin && b <= yMax) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(toCanvasX(0), bCanvasY, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    // Update info
-    const mStr = m.toFixed(2);
-    const bStr = b.toFixed(2);
-    formulaDisplay.textContent = `y = ${mStr}x${b >= 0 ? ' + ' : ' - '}${Math.abs(b).toFixed(2)}`;
-    mDisplay.textContent = mStr;
-    bDisplay.textContent = bStr;
-    coordDisplay.textContent = `(0, ${bStr})`;
-    colorDot.style.backgroundColor = color;
-  }
-
-  // Mouse tracking
-  canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    const canvasPx = (px / rect.width) * W;
-    const canvasPy = (py / rect.height) * H;
-    const x = (canvasPx - pad) / scaleX + xMin;
-    const y = yMax - (canvasPy - pad) / scaleY;
-    if (x >= xMin && x <= xMax && y >= yMin && y <= yMax) {
-      canvas.title = `(${x.toFixed(2)}, ${y.toFixed(2)})`;
-    }
-  });
-
-  [slopeInput, interceptInput, colorInput].forEach(el =>
-    el.addEventListener('input', draw)
-  );
-
-  draw();
-</script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
