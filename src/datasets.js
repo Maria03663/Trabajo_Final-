@@ -1,9 +1,37 @@
+const datasetEntries = {
+  synthetic: { fn: syntheticDataset, type: 'classification', label: 'Sintético 2D' },
+  iris: { fn: irisDataset, type: 'classification', label: 'Iris (Setosa vs Versicolor)' },
+  'synthetic-reg': { fn: syntheticRegressionDataset, type: 'regression', label: 'Sintético Regresión' },
+};
+
+const customDatasets = new Map();
+
 export function getDataset(name) {
-  switch (name) {
-    case 'synthetic': return syntheticDataset();
-    case 'iris': return irisDataset();
-    default: return syntheticDataset();
+  if (customDatasets.has(name)) {
+    return structuredClone(customDatasets.get(name).dataset);
   }
+  const entry = datasetEntries[name];
+  if (!entry) return syntheticDataset();
+  return entry.fn();
+}
+
+export function getDatasetsByType(type) {
+  const result = [];
+  for (const [value, entry] of Object.entries(datasetEntries)) {
+    if (entry.type === type) {
+      result.push({ value, label: entry.label });
+    }
+  }
+  for (const [name, data] of customDatasets) {
+    if (data.type === type) {
+      result.push({ value: name, label: name });
+    }
+  }
+  return result;
+}
+
+export function registerCustomDataset(name, dataset, type) {
+  customDatasets.set(name, { dataset, type });
 }
 
 function rng(seed) {
@@ -19,7 +47,8 @@ function syntheticDataset() {
   return {
     samples: data,
     featureNames: ['Feature 1', 'Feature 2'],
-    classNames: ['Clase 0', 'Clase 1']
+    classNames: ['Clase 0', 'Clase 1'],
+    type: 'classification'
   };
 }
 
@@ -42,6 +71,23 @@ function irisDataset() {
   return {
     samples: data,
     featureNames: ['Largo pétalo', 'Ancho pétalo'],
-    classNames: ['Setosa', 'Versicolor']
+    classNames: ['Setosa', 'Versicolor'],
+    type: 'classification'
+  };
+}
+
+function syntheticRegressionDataset() {
+  const data = [];
+  const r = rng(42);
+  for (let i = 0; i < 50; i++) {
+    const x1 = r() * 10;
+    const x2 = r() * 10;
+    const y = 3 + 2.5 * x1 - 1.8 * x2 + (r() - 0.5) * 3;
+    data.push({ features: [x1, x2], label: y });
+  }
+  return {
+    samples: data,
+    featureNames: ['Feature 1', 'Feature 2'],
+    type: 'regression'
   };
 }

@@ -90,3 +90,85 @@ export function f1Score(yTrue, yPred) {
   const r = recallScore(yTrue, yPred);
   return p + r === 0 ? 0 : 2 * p * r / (p + r);
 }
+
+export class LinearRegression {
+  constructor() {
+    this.weights = null;
+    this.bias = null;
+    this.costHistory = [];
+    this.trained = false;
+  }
+
+  fit(X, y, { learningRate = 0.01, epochs = 1000 } = {}) {
+    const n = X.length;
+    const m = X[0].length;
+    this.weights = new Array(m).fill(0);
+    this.bias = 0;
+    this.costHistory = [];
+
+    for (let epoch = 0; epoch < epochs; epoch++) {
+      const preds = new Array(n);
+      for (let i = 0; i < n; i++) {
+        let z = this.bias;
+        for (let j = 0; j < m; j++) z += this.weights[j] * X[i][j];
+        preds[i] = z;
+      }
+      let cost = 0;
+      for (let i = 0; i < n; i++) {
+        const d = preds[i] - y[i];
+        cost += d * d;
+      }
+      this.costHistory.push(cost / n);
+      const dw = new Array(m).fill(0);
+      let db = 0;
+      for (let i = 0; i < n; i++) {
+        const err = preds[i] - y[i];
+        for (let j = 0; j < m; j++) dw[j] += err * X[i][j];
+        db += err;
+      }
+      const scale = 2 * learningRate / n;
+      for (let j = 0; j < m; j++) this.weights[j] -= scale * dw[j];
+      this.bias -= scale * db;
+    }
+    this.trained = true;
+    return this;
+  }
+
+  predict(X) {
+    if (!this.trained) throw new Error('Modelo no entrenado');
+    return X.map(x => {
+      let z = this.bias;
+      for (let j = 0; j < this.weights.length; j++) z += this.weights[j] * x[j];
+      return z;
+    });
+  }
+}
+
+export function mse(yTrue, yPred) {
+  let s = 0;
+  for (let i = 0; i < yTrue.length; i++) {
+    const d = yTrue[i] - yPred[i];
+    s += d * d;
+  }
+  return s / yTrue.length;
+}
+
+export function rmse(yTrue, yPred) {
+  return Math.sqrt(mse(yTrue, yPred));
+}
+
+export function mae(yTrue, yPred) {
+  let s = 0;
+  for (let i = 0; i < yTrue.length; i++) s += Math.abs(yTrue[i] - yPred[i]);
+  return s / yTrue.length;
+}
+
+export function r2Score(yTrue, yPred) {
+  const mean = yTrue.reduce((a, b) => a + b, 0) / yTrue.length;
+  let ssRes = 0, ssTot = 0;
+  for (let i = 0; i < yTrue.length; i++) {
+    ssRes += (yTrue[i] - yPred[i]) ** 2;
+    ssTot += (yTrue[i] - mean) ** 2;
+  }
+  return ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+}

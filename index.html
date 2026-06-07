@@ -3,20 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Classifica — Regresión Logística</title>
+  <title>Classifica — Regresión Logística y Lineal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-  <div class="app">
+  <nav class="nav">
+    <div class="nav-inner">
+      <span class="nav-logo">&#9670; Classifica</span>
+      <div class="nav-links">
+        <button class="nav-btn active" data-section="home">Inicio</button>
+        <button class="nav-btn" data-section="app">App</button>
+        <button class="nav-btn" data-section="tutorials">Tutoriales</button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <section id="section-home" class="section active">
+      <div class="hero">
+        <div class="hero-badge">&#9670; Machine Learning Visual</div>
+        <h1 class="hero-title">Aprend&eacute; regresi&oacute;n<br>vi&eacute;ndola funcionar</h1>
+        <p class="hero-sub">Entren&aacute; modelos de regresi&oacute;n log&iacute;stica y lineal paso a paso. Observ&aacute; cada &eacute;poca del descenso de gradiente, visualiz&aacute; la frontera de decisi&oacute;n y evalu&aacute; resultados en vivo &mdash; todo desde el navegador.</p>
+        <div class="hero-actions">
+          <button class="btn hero-btn" id="heroCTA">Ir a la App</button>
+          <button class="btn hero-btn-outline" id="heroTutorials">Ver Tutoriales</button>
+        </div>
+      </div>
+
+      <div class="features">
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-icon">&#9670;</div>
+            <h3>Regresi&oacute;n Log&iacute;stica</h3>
+            <p>Clasificaci&oacute;n binaria con sigmoide, frontera de decisi&oacute;n y probabilidades.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">&#9671;</div>
+            <h3>Regresi&oacute;n Lineal</h3>
+            <p>Predicci&oacute;n de valores continuos con superficie de regresi&oacute;n y plano ajustado.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">&#11014;</div>
+            <h3>Sub&iacute; tu CSV</h3>
+            <p>Carg&aacute; tus propios datasets y seleccion&aacute; columnas para features y etiqueta.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">&#9673;</div>
+            <h3>M&eacute;tricas completas</h3>
+            <p>Accuracy, F1, MSE, RMSE, R&sup2; y matriz de confusi&oacute;n para cada modelo.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">&#9672;</div>
+            <h3>Visualizaci&oacute;n 2D</h3>
+            <p>Mapas de calor de probabilidades y superficies de regresi&oacute;n en el plano.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">&#9654;</div>
+            <h3>Predicci&oacute;n en vivo</h3>
+            <p>Ajust&aacute; sliders o hac&eacute; click en el gr&aacute;fico para predecir al instante.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-grid">
+          <div class="stat-item"><span class="stat-num">2</span><span class="stat-lbl">Modelos</span></div>
+          <div class="stat-item"><span class="stat-num">4+</span><span class="stat-lbl">Datasets</span></div>
+          <div class="stat-item"><span class="stat-num">8</span><span class="stat-lbl">M&eacute;tricas</span></div>
+          <div class="stat-item"><span class="stat-num">&#9673;</span><span class="stat-lbl">Tiempo real</span></div>
+        </div>
+      </div>
+
+      <footer class="footer home-footer">Classifica &mdash; Proyecto educativo &middot; Regresi&oacute;n Log&iacute;stica y Lineal desde cero</footer>
+    </section>
+
+    <section id="section-app" class="section">
+      <div class="app">
     <header class="header">
       <div class="header-row">
         <span class="logo">&#9670;</span>
         <h1 class="title">Classifica</h1>
       </div>
-      <p class="subtitle">Regresión Logística — Entrenamiento, Evaluación y Predicción en vivo</p>
+      <p class="subtitle">Regresión Logística · Regresión Lineal — Entrenamiento, Evaluación y Predicción en vivo</p>
     </header>
 
     <div class="controls">
@@ -25,6 +96,14 @@
         <select id="datasetSel">
           <option value="synthetic">Sintético 2D</option>
           <option value="iris">Iris (Setosa vs Versicolor)</option>
+        </select>
+        <button class="btn btn-upload" id="uploadBtn">⬆ Subir CSV</button>
+      </div>
+      <div class="c-group">
+        <label>Modelo</label>
+        <select id="modelTypeSel">
+          <option value="classification">Regresión Logística</option>
+          <option value="regression">Regresión Lineal</option>
         </select>
       </div>
       <div class="c-group">
@@ -48,8 +127,8 @@
       <span class="sep"></span>
       <span id="featureInfo">Features: 2</span>
       <span class="sep"></span>
-      <span><span class="dot c0"></span> Clase 0</span>
-      <span><span class="dot c1"></span> Clase 1</span>
+      <span id="classLabel0"><span class="dot c0"></span> Clase 0</span>
+      <span id="classLabel1"><span class="dot c1"></span> Clase 1</span>
     </div>
 
     <div class="grid-2">
@@ -83,14 +162,20 @@
       <div class="panel-h">
         <h2>Métricas de Evaluación</h2>
       </div>
-      <div class="m-grid">
+      <div class="m-grid" id="classifMetrics" style="display:none">
         <div class="m-card"><div class="m-val" id="mAcc">—</div><div class="m-lbl">Accuracy</div></div>
         <div class="m-card"><div class="m-val" id="mPrec">—</div><div class="m-lbl">Precision</div></div>
         <div class="m-card"><div class="m-val" id="mRec">—</div><div class="m-lbl">Recall</div></div>
         <div class="m-card"><div class="m-val" id="mF1">—</div><div class="m-lbl">F1-Score</div></div>
       </div>
+      <div class="m-grid" id="regMetrics" style="display:none">
+        <div class="m-card"><div class="m-val" id="mMSE">—</div><div class="m-lbl">MSE</div></div>
+        <div class="m-card"><div class="m-val" id="mRMSE">—</div><div class="m-lbl">RMSE</div></div>
+        <div class="m-card"><div class="m-val" id="mMAE">—</div><div class="m-lbl">MAE</div></div>
+        <div class="m-card"><div class="m-val" id="mR2">—</div><div class="m-lbl">R²</div></div>
+      </div>
       <div class="m-detail">
-        <div>
+        <div id="confMatrixSection" style="display:none">
           <h3>Matriz de Confusión</h3>
           <div class="cm">
             <div></div><div class="cm-h">Pred 0</div><div class="cm-h">Pred 1</div>
@@ -133,7 +218,54 @@
       </div>
     </section>
 
-    <footer class="footer">Classifica — Proyecto educativo · Regresión Logística desde cero</footer>
+    <footer class="footer">Classifica — Proyecto educativo · Regresión Logística y Lineal desde cero</footer>
+  </div>
+    </section>
+
+    <section id="section-tutorials" class="section" style="display:none">
+      <div class="tutorials-header">
+        <h2 class="tutorials-title">Tutoriales</h2>
+        <p class="tutorials-sub">Aprend&eacute; los conceptos detr&aacute;s de cada modelo.</p>
+      </div>
+      <div class="tutorials-grid" id="tutorialsGrid"></div>
+      <footer class="footer">Classifica &mdash; Proyecto educativo &middot; Regresi&oacute;n Log&iacute;stica y Lineal desde cero</footer>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none">
+    <div class="modal">
+      <div class="modal-h">
+        <h2>⬆ Subir dataset CSV</h2>
+      </div>
+      <div class="modal-body">
+        <div class="modal-group">
+          <label>Archivo</label>
+          <span class="modal-fname" id="modalFileName">—</span>
+        </div>
+        <div class="modal-group">
+          <label>Nombre del dataset</label>
+          <input type="text" id="modalDatasetName" class="modal-input" placeholder="ej: Mi dataset">
+        </div>
+        <div class="modal-group">
+          <label>Columna de etiqueta</label>
+          <select id="modalLabelCol" class="modal-select"></select>
+        </div>
+        <div class="modal-group">
+          <label>Característica 1</label>
+          <select id="modalFeat1Col" class="modal-select"></select>
+        </div>
+        <div class="modal-group">
+          <label>Característica 2</label>
+          <select id="modalFeat2Col" class="modal-select"></select>
+        </div>
+        <div class="modal-info" id="modalClassInfo"></div>
+        <div class="modal-error" id="modalError"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="modalCancel">Cancelar</button>
+        <button class="btn primary" id="modalConfirm">Cargar dataset</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

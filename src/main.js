@@ -1,10 +1,13 @@
-import { LogisticRegression, accuracy, confusionMatrix, precisionScore, recallScore, f1Score } from './logistic-regression.js';
-import { getDataset } from './datasets.js';
+import { LogisticRegression, LinearRegression, accuracy, confusionMatrix, precisionScore, recallScore, f1Score, mse, rmse, mae, r2Score } from './models.js';
+import { getDataset, getDatasetsByType } from './datasets.js';
+import { setupCSVUpload } from './csv-upload.js';
+import { tutorials } from './tutorials.js';
 
 const state = {
   dataset: getDataset('synthetic'),
   model: null, Xtrain: [], ytrain: [], Xtest: [], ytest: [],
   means: null, stds: null, training: false, trained: false,
+  modelType: 'classification',
   colors: ['#22d3ee', '#f472b6'],
   xMin: 0, xMax: 10, yMin: 0, yMax: 10
 };
@@ -12,6 +15,7 @@ const state = {
 // DOM
 const $ = id => document.getElementById(id);
 const datasetSel = $('datasetSel');
+const modelTypeSel = $('modelTypeSel');
 const splitRange = $('splitRange');
 const splitLabel = $('splitLabel');
 const lrRange = $('lrRange');
@@ -24,9 +28,15 @@ const epochBadge = $('epochBadge');
 const costBadge = $('costBadge');
 const sampleInfo = $('sampleInfo');
 const featureInfo = $('featureInfo');
+const classLabel0 = $('classLabel0');
+const classLabel1 = $('classLabel1');
 const metricsPanel = $('metricsPanel');
+const classifMetrics = $('classifMetrics');
+const regMetrics = $('regMetrics');
+const confMatrixSection = $('confMatrixSection');
 const predictPanel = $('predictPanel');
 const mAcc = $('mAcc'), mPrec = $('mPrec'), mRec = $('mRec'), mF1 = $('mF1');
+const mMSE = $('mMSE'), mRMSE = $('mRMSE'), mMAE = $('mMAE'), mR2 = $('mR2');
 const cmTN = $('cmTN'), cmFP = $('cmFP'), cmFN = $('cmFN'), cmTP = $('cmTP');
 const cfBias = $('cfBias'), cfW1 = $('cfW1'), cfW2 = $('cfW2'), cfFormula = $('cfFormula');
 const predSlider1 = $('predSlider1'), predSlider2 = $('predSlider2');
@@ -36,17 +46,63 @@ const predOut = $('predOut');
 const bCanvas = $('boundaryCanvas'), bCtx = bCanvas.getContext('2d');
 const cCanvas = $('costCanvas'), cCtx = cCanvas.getContext('2d');
 const tooltip = $('canvasTooltip');
+const panelTitle = document.querySelector('.grid-2 .panel:first-child .panel-h h2');
+
+// ── Model type ────────────────────────────────────
+
+function rebuildDatasetOptions(type) {
+  const datasets = getDatasetsByType(type);
+  datasetSel.innerHTML = '';
+  for (const d of datasets) {
+    const opt = document.createElement('option');
+    opt.value = d.value;
+    opt.textContent = d.label;
+    datasetSel.appendChild(opt);
+  }
+  datasetSel.value = datasets[0].value;
+  applyModelTypeUI(type);
+  loadDataset();
+}
+
+function applyModelTypeUI(type) {
+  const isReg = type === 'regression';
+  panelTitle.textContent = isReg ? 'Superficie de Regresión' : 'Frontera de Decisión';
+  classLabel0.style.display = isReg ? 'none' : '';
+  classLabel1.style.display = isReg ? 'none' : '';
+  classifMetrics.style.display = isReg ? 'none' : '';
+  regMetrics.style.display = isReg ? '' : 'none';
+  confMatrixSection.style.display = isReg ? 'none' : '';
+  const fn = state.dataset ? state.dataset.featureNames : ['x₁', 'x₂'];
+  cfFormula.innerHTML = isReg
+    ? `ŷ = β₀ + β₁·${fn[0]} + β₂·${fn[1]}`
+    : `ŷ = σ(β₀ + β₁·${fn[0]} + β₂·${fn[1]})`;
+  costBadge.textContent = isReg ? 'MSE: —' : 'Costo: —';
+}
+
+modelTypeSel.addEventListener('change', () => {
+  state.modelType = modelTypeSel.value;
+  state.model = null; state.trained = false;
+  resetUI();
+  rebuildDatasetOptions(state.modelType);
+});
 
 // ── Dataset ────────────────────────────────────
 
 function loadDataset() {
-  state.dataset = getDataset(datasetSel.value);
+  const ds = getDataset(datasetSel.value);
+  if (!ds) return;
+  state.dataset = ds;
   state.model = null; state.trained = false;
-  const { samples, featureNames } = state.dataset;
+  const { samples, featureNames } = ds;
   sampleInfo.textContent = `Muestras: ${samples.length}`;
   featureInfo.textContent = `Features: ${featureNames.length}`;
   predLabel1.textContent = featureNames[0];
   predLabel2.textContent = featureNames[1];
+
+  if (ds.classNames) {
+    classLabel0.innerHTML = `<span class="dot c0"></span> ${ds.classNames[0]}`;
+    classLabel1.innerHTML = `<span class="dot c1"></span> ${ds.classNames[1]}`;
+  }
 
   let xM = Infinity, xX = -Infinity, yM = Infinity, yX = -Infinity;
   for (const s of samples) {
@@ -56,13 +112,13 @@ function loadDataset() {
   const xp = (xX - xM) * 0.15 || 0.5, yp = (yX - yM) * 0.15 || 0.5;
   state.xMin = xM - xp; state.xMax = xX + xp; state.yMin = yM - yp; state.yMax = yX + yp;
 
-  // Set slider ranges to data bounds
   predSlider1.min = state.xMin; predSlider1.max = state.xMax; predSlider1.value = (state.xMin + state.xMax) / 2;
   predSlider2.min = state.yMin; predSlider2.max = state.yMax; predSlider2.value = (state.yMin + state.yMax) / 2;
   predVal1.textContent = parseFloat(predSlider1.value).toFixed(1);
   predVal2.textContent = parseFloat(predSlider2.value).toFixed(1);
 
   resetUI();
+  applyModelTypeUI(state.modelType);
   drawBoundary();
   drawCostChart([]);
 }
@@ -73,7 +129,7 @@ function resetUI() {
   resetBtn.disabled = true;
   trainBtn.disabled = false;
   epochBadge.textContent = '0 épocas';
-  costBadge.textContent = 'Costo: —';
+  costBadge.textContent = state.modelType === 'regression' ? 'MSE: —' : 'Costo: —';
   state.trained = false;
 }
 
@@ -131,7 +187,12 @@ async function trainModel() {
   const Xs = standardize(state.Xtrain, state.means, state.stds);
   const lr = parseInt(lrRange.value) / 100;
   const epochs = parseInt(epochsInput.value);
-  const model = new LogisticRegression();
+  const isReg = state.modelType === 'regression';
+  const model = isReg ? new LinearRegression() : new LogisticRegression();
+  const m = state.Xtrain[0].length;
+  model.weights = new Array(m).fill(0);
+  model.bias = 0;
+  model.costHistory = [];
 
   await new Promise(resolve => {
     let completed = 0;
@@ -142,29 +203,45 @@ async function trainModel() {
       for (let e = completed; e < end; e++) {
         const preds = Xs.map(x => {
           let z = model.bias;
-          for (let j = 0; j < model.weights.length; j++) z += model.weights[j] * x[j];
-          return model.sigmoid(z);
+          for (let j = 0; j < m; j++) z += model.weights[j] * x[j];
+          return isReg ? z : model.sigmoid(z);
         });
+
         let cost = 0;
-        for (let i = 0; i < Xs.length; i++) {
-          const eps = 1e-12;
-          cost += -state.ytrain[i] * Math.log(preds[i] + eps) - (1 - state.ytrain[i]) * Math.log(1 - preds[i] + eps);
+        if (isReg) {
+          for (let i = 0; i < Xs.length; i++) {
+            const d = preds[i] - state.ytrain[i];
+            cost += d * d;
+          }
+          cost /= Xs.length;
+        } else {
+          for (let i = 0; i < Xs.length; i++) {
+            const eps = 1e-12;
+            cost += -state.ytrain[i] * Math.log(preds[i] + eps) - (1 - state.ytrain[i]) * Math.log(1 - preds[i] + eps);
+          }
+          cost /= Xs.length;
         }
-        model.costHistory.push(cost / Xs.length);
-        const dw = new Array(model.weights.length).fill(0);
+        model.costHistory.push(cost);
+
+        const dw = new Array(m).fill(0);
         let db = 0;
         for (let i = 0; i < Xs.length; i++) {
           const err = preds[i] - state.ytrain[i];
-          for (let j = 0; j < model.weights.length; j++) dw[j] += err * Xs[i][j];
+          for (let j = 0; j < m; j++) dw[j] += err * Xs[i][j];
           db += err;
         }
-        for (let j = 0; j < model.weights.length; j++) model.weights[j] -= (lr / Xs.length) * dw[j];
-        model.bias -= (lr / Xs.length) * db;
+
+        const scale = (isReg ? 2 * lr : lr) / Xs.length;
+        for (let j = 0; j < m; j++) model.weights[j] -= scale * dw[j];
+        model.bias -= scale * db;
       }
+
       completed = end;
       epochBadge.textContent = `${completed} épocas`;
-      if (model.costHistory.length > 0)
-        costBadge.textContent = `Costo: ${model.costHistory[model.costHistory.length - 1].toFixed(4)}`;
+      if (model.costHistory.length > 0) {
+        const label = isReg ? 'MSE' : 'Costo';
+        costBadge.textContent = `${label}: ${model.costHistory[model.costHistory.length - 1].toFixed(4)}`;
+      }
       drawCostChart(model.costHistory);
       if (completed < epochs) setTimeout(step, 25);
       else { model.trained = true; state.model = model; resolve(); }
@@ -184,29 +261,41 @@ async function trainModel() {
 function showMetrics() {
   const Xs = standardize(state.Xtest, state.means, state.stds);
   const preds = state.model.predict(Xs);
-  const acc = accuracy(state.ytest, preds);
-  const prec = precisionScore(state.ytest, preds);
-  const rec = recallScore(state.ytest, preds);
-  const f1 = f1Score(state.ytest, preds);
-  const cm = confusionMatrix(state.ytest, preds);
+  const isReg = state.modelType === 'regression';
 
-  mAcc.textContent = acc.toFixed(3);
-  mPrec.textContent = prec.toFixed(3);
-  mRec.textContent = rec.toFixed(3);
-  mF1.textContent = f1.toFixed(3);
-  cmTN.textContent = cm.tn; cmFP.textContent = cm.fp;
-  cmFN.textContent = cm.fn; cmTP.textContent = cm.tp;
+  if (isReg) {
+    const m = mse(state.ytest, preds);
+    mMSE.textContent = m.toFixed(4);
+    mRMSE.textContent = rmse(state.ytest, preds).toFixed(4);
+    mMAE.textContent = mae(state.ytest, preds).toFixed(4);
+    mR2.textContent = r2Score(state.ytest, preds).toFixed(4);
+  } else {
+    const acc = accuracy(state.ytest, preds);
+    const prec = precisionScore(state.ytest, preds);
+    const rec = recallScore(state.ytest, preds);
+    const f1 = f1Score(state.ytest, preds);
+    const cm = confusionMatrix(state.ytest, preds);
+    mAcc.textContent = acc.toFixed(3);
+    mPrec.textContent = prec.toFixed(3);
+    mRec.textContent = rec.toFixed(3);
+    mF1.textContent = f1.toFixed(3);
+    cmTN.textContent = cm.tn; cmFP.textContent = cm.fp;
+    cmFN.textContent = cm.fn; cmTP.textContent = cm.tp;
+  }
+
   cfBias.textContent = state.model.bias.toFixed(4);
   cfW1.textContent = state.model.weights[0].toFixed(4);
   cfW2.textContent = state.model.weights[1].toFixed(4);
 
   const fn = state.dataset.featureNames;
-  cfFormula.innerHTML = `ŷ = σ(${state.model.bias.toFixed(3)} + ${state.model.weights[0].toFixed(3)}·${fn[0]} + ${state.model.weights[1].toFixed(3)}·${fn[1]})`;
+  const prefix = isReg ? '' : 'σ(';
+  const suffix = isReg ? '' : ')';
+  cfFormula.innerHTML = `ŷ = ${prefix}${state.model.bias.toFixed(3)} + ${state.model.weights[0].toFixed(3)}·${fn[0]} + ${state.model.weights[1].toFixed(3)}·${fn[1]}${suffix}`;
 
   doLivePredict();
 }
 
-// ── Canvas: boundary ───────────────────────────
+// ── Canvas: boundary / surface ──────────────────
 
 const BW = 500, BH = 400, BPAD = 40;
 
@@ -222,8 +311,26 @@ function drawBoundary() {
   const toY = v => BH - BPAD - (v - yMin) * sy;
   state._sx = sx; state._sy = sy; state._toX = toX; state._toY = toY;
 
-  // Heatmap
-  if (state.trained) {
+  const isReg = state.modelType === 'regression';
+
+  if (isReg && state.trained) {
+    const yVals = samples.map(s => s.label);
+    const yMinR = Math.min(...yVals), yMaxR = Math.max(...yVals), yRange = yMaxR - yMinR || 1;
+    for (let px = 0; px < BW; px += 3) {
+      for (let py = 0; py < BH; py += 3) {
+        const x = (px - BPAD) / sx + xMin;
+        const y = (BH - BPAD - py) / sy + yMin;
+        const xs = [(x - state.means[0]) / state.stds[0], (y - state.means[1]) / state.stds[1]];
+        let z = state.model.bias;
+        for (let j = 0; j < xs.length; j++) z += state.model.weights[j] * xs[j];
+        const t = Math.max(0, Math.min(1, (z - yMinR) / yRange));
+        const r = Math.round(255 * t);
+        const b = Math.round(255 * (1 - t));
+        bCtx.fillStyle = `rgba(${r},150,${b},0.12)`;
+        bCtx.fillRect(px, py, 3, 3);
+      }
+    }
+  } else if (!isReg && state.trained) {
     for (let px = 0; px < BW; px += 3) {
       for (let py = 0; py < BH; py += 3) {
         const x = (px - BPAD) / sx + xMin;
@@ -256,14 +363,31 @@ function drawBoundary() {
   if (0 >= yMin && 0 <= yMax) { bCtx.beginPath(); bCtx.moveTo(BPAD, toY(0)); bCtx.lineTo(BW - BPAD, toY(0)); bCtx.stroke(); }
 
   // Points
-  for (const s of samples) {
-    const cx = toX(s.features[0]), cy = toY(s.features[1]);
-    const color = state.colors[s.label];
-    bCtx.shadowColor = color; bCtx.shadowBlur = 7;
-    bCtx.fillStyle = color;
-    bCtx.beginPath(); bCtx.arc(cx, cy, 5, 0, Math.PI * 2); bCtx.fill();
-    bCtx.shadowBlur = 0;
-    bCtx.strokeStyle = 'rgba(255,255,255,0.25)'; bCtx.lineWidth = 1; bCtx.stroke();
+  if (isReg && state.trained) {
+    const yVals = samples.map(s => s.label);
+    const yMinR = Math.min(...yVals), yMaxR = Math.max(...yVals), yRange = yMaxR - yMinR || 1;
+    for (const s of samples) {
+      const cx = toX(s.features[0]), cy = toY(s.features[1]);
+      const t = Math.max(0, Math.min(1, (s.label - yMinR) / yRange));
+      const r = Math.round(255 * t);
+      const b = Math.round(255 * (1 - t));
+      const color = `rgb(${r},130,${b})`;
+      bCtx.shadowColor = color; bCtx.shadowBlur = 7;
+      bCtx.fillStyle = color;
+      bCtx.beginPath(); bCtx.arc(cx, cy, 5, 0, Math.PI * 2); bCtx.fill();
+      bCtx.shadowBlur = 0;
+      bCtx.strokeStyle = 'rgba(255,255,255,0.25)'; bCtx.lineWidth = 1; bCtx.stroke();
+    }
+  } else {
+    for (const s of samples) {
+      const cx = toX(s.features[0]), cy = toY(s.features[1]);
+      const color = state.colors[s.label];
+      bCtx.shadowColor = color; bCtx.shadowBlur = 7;
+      bCtx.fillStyle = color;
+      bCtx.beginPath(); bCtx.arc(cx, cy, 5, 0, Math.PI * 2); bCtx.fill();
+      bCtx.shadowBlur = 0;
+      bCtx.strokeStyle = 'rgba(255,255,255,0.25)'; bCtx.lineWidth = 1; bCtx.stroke();
+    }
   }
 
   // Labels
@@ -345,18 +469,25 @@ function doLivePredict() {
   const xs = [(f1 - state.means[0]) / state.stds[0], (f2 - state.means[1]) / state.stds[1]];
   let z = state.model.bias;
   for (let j = 0; j < xs.length; j++) z += state.model.weights[j] * xs[j];
-  const prob = state.model.sigmoid(z);
-  const cls = prob >= 0.5 ? 1 : 0;
-  const name = state.dataset.classNames[cls];
-  const color = state.colors[cls];
-  const pct = (prob >= 0.5 ? prob : 1 - prob) * 100;
 
-  predOut.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <div style="font-size:1.2rem;font-weight:700;color:${color}">${name}</div>
-      <div style="font-size:0.85rem;color:var(--text2)">Confianza: <strong style="color:var(--accent2);font-family:var(--mono)">${pct.toFixed(1)}%</strong></div>
-    </div>
-  `;
+  if (state.modelType === 'regression') {
+    predOut.innerHTML = `
+      <div style="font-size:1.4rem;font-weight:800;font-family:var(--mono);color:var(--accent2)">${z.toFixed(4)}</div>
+      <div style="font-size:0.78rem;color:var(--text3)">Valor predicho</div>
+    `;
+  } else {
+    const prob = state.model.sigmoid(z);
+    const cls = prob >= 0.5 ? 1 : 0;
+    const name = state.dataset.classNames[cls];
+    const color = state.colors[cls];
+    const pct = (prob >= 0.5 ? prob : 1 - prob) * 100;
+    predOut.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:1.2rem;font-weight:700;color:${color}">${name}</div>
+        <div style="font-size:0.85rem;color:var(--text2)">Confianza: <strong style="color:var(--accent2);font-family:var(--mono)">${pct.toFixed(1)}%</strong></div>
+      </div>
+    `;
+  }
 }
 
 function predictAtPoint(x, y) {
@@ -376,14 +507,12 @@ bCanvas.addEventListener('mousemove', e => {
   const py = (e.clientY - rect.top) / rect.height * BH;
   const toX = state._toX, toY = state._toY;
   if (!toX) return;
-  // Reverse map to data coords
   const x = (px - BPAD) / state._sx + state.xMin;
   const y = (BH - BPAD - py) / state._sy + state.yMin;
   if (x < state.xMin || x > state.xMax || y < state.yMin || y > state.yMax) {
     tooltip.classList.remove('show');
     return;
   }
-
   tooltip.style.left = (px + 12) + 'px';
   tooltip.style.top = (py - 10) + 'px';
   tooltip.textContent = `(${x.toFixed(2)}, ${y.toFixed(2)})`;
@@ -421,7 +550,76 @@ predSlider2.addEventListener('input', () => {
   doLivePredict();
 });
 
+// ── Section Navigation ─────────────────────────
+
+const navBtns = document.querySelectorAll('.nav-btn');
+const sections = {
+  home: document.getElementById('section-home'),
+  app: document.getElementById('section-app'),
+  tutorials: document.getElementById('section-tutorials')
+};
+
+function showSection(name) {
+  Object.keys(sections).forEach(key => {
+    sections[key].style.display = key === name ? '' : 'none';
+  });
+  navBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.section === name);
+  });
+}
+
+navBtns.forEach(btn => {
+  btn.addEventListener('click', () => showSection(btn.dataset.section));
+});
+
+document.getElementById('heroCTA').addEventListener('click', () => showSection('app'));
+document.getElementById('heroTutorials').addEventListener('click', () => showSection('tutorials'));
+
+// ── Tutorials ──────────────────────────────────
+
+function renderTutorials() {
+  const grid = document.getElementById('tutorialsGrid');
+  if (!grid) return;
+  grid.innerHTML = tutorials.map(t => `
+    <div class="tutorial-card" data-tutorial="${t.id}">
+      <div class="tutorial-card-header">
+        <span class="tutorial-card-title">${t.title}</span>
+        <span class="tutorial-card-arrow">&#9654;</span>
+      </div>
+      <div class="tutorial-card-body">${t.content}</div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.tutorial-card').forEach(card => {
+    card.querySelector('.tutorial-card-header').addEventListener('click', () => {
+      card.classList.toggle('expanded');
+      const arrow = card.querySelector('.tutorial-card-arrow');
+      arrow.innerHTML = card.classList.contains('expanded') ? '&#9660;' : '&#9654;';
+    });
+  });
+}
+
+renderTutorials();
+
 // ── Init ───────────────────────────────────────
 
-loadDataset();
-drawCostChart([]);
+function init() {
+  rebuildDatasetOptions(state.modelType);
+
+  setupCSVUpload((name) => {
+    let exists = false;
+    for (const opt of datasetSel.options) {
+      if (opt.value === name) { exists = true; break; }
+    }
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      datasetSel.appendChild(opt);
+    }
+    datasetSel.value = name;
+    loadDataset();
+  });
+}
+
+init();
