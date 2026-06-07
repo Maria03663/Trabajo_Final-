@@ -1,138 +1,114 @@
-import { animate, stagger } from 'motion';
 import { LogisticRegression, accuracy, confusionMatrix, precisionScore, recallScore, f1Score } from './logistic-regression.js';
 import { getDataset } from './datasets.js';
 
-let state = {
+const state = {
   dataset: getDataset('synthetic'),
-  model: null,
-  Xtrain: [],
-  ytrain: [],
-  Xtest: [],
-  ytest: [],
-  means: null,
-  stds: null,
-  training: false,
-  colors: ['#22d3ee', '#f472b6']
+  model: null, Xtrain: [], ytrain: [], Xtest: [], ytest: [],
+  means: null, stds: null, training: false, trained: false,
+  colors: ['#22d3ee', '#f472b6'],
+  xMin: 0, xMax: 10, yMin: 0, yMax: 10
 };
 
-const boundaryCanvas = document.getElementById('boundaryCanvas');
-const bCtx = boundaryCanvas.getContext('2d');
-const costCanvas = document.getElementById('costCanvas');
-const cCtx = costCanvas.getContext('2d');
+// DOM
+const $ = id => document.getElementById(id);
+const datasetSel = $('datasetSel');
+const splitRange = $('splitRange');
+const splitLabel = $('splitLabel');
+const lrRange = $('lrRange');
+const lrLabel = $('lrLabel');
+const epochsInput = $('epochsInput');
+const trainBtn = $('trainBtn');
+const resetBtn = $('resetBtn');
+const overlay = $('trainOverlay');
+const epochBadge = $('epochBadge');
+const costBadge = $('costBadge');
+const sampleInfo = $('sampleInfo');
+const featureInfo = $('featureInfo');
+const metricsPanel = $('metricsPanel');
+const predictPanel = $('predictPanel');
+const mAcc = $('mAcc'), mPrec = $('mPrec'), mRec = $('mRec'), mF1 = $('mF1');
+const cmTN = $('cmTN'), cmFP = $('cmFP'), cmFN = $('cmFN'), cmTP = $('cmTP');
+const cfBias = $('cfBias'), cfW1 = $('cfW1'), cfW2 = $('cfW2'), cfFormula = $('cfFormula');
+const predSlider1 = $('predSlider1'), predSlider2 = $('predSlider2');
+const predVal1 = $('predVal1'), predVal2 = $('predVal2');
+const predLabel1 = $('predLabel1'), predLabel2 = $('predLabel2');
+const predOut = $('predOut');
+const bCanvas = $('boundaryCanvas'), bCtx = bCanvas.getContext('2d');
+const cCanvas = $('costCanvas'), cCtx = cCanvas.getContext('2d');
+const tooltip = $('canvasTooltip');
 
-// ── Motion entrance animations ────────────────
-animate('#header', { opacity: [0, 1], y: [24, 0] }, { duration: 0.55, easing: [0.22, 0.03, 0.26, 1], delay: 0 });
-animate('#controlBar', { opacity: [0, 1], y: [18, 0] }, { duration: 0.5, easing: [0.22, 0.03, 0.26, 1], delay: 0.1 });
-animate('#sampleInfo', { opacity: [0, 1], y: [12, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1], delay: 0.18 });
-animate('.main-grid', { opacity: [0, 1], y: [28, 0] }, { duration: 0.55, easing: [0.22, 0.03, 0.26, 1], delay: 0.28 });
+// ── Dataset ────────────────────────────────────
 
-// Micro‑animation on control bar children
-animate('.control-group', { opacity: [0, 1], y: [10, 0] }, { duration: 0.35, easing: [0.22, 0.03, 0.26, 1], delay: stagger(0.06, { from: 'first', start: 0.15 }) });
+function loadDataset() {
+  state.dataset = getDataset(datasetSel.value);
+  state.model = null; state.trained = false;
+  const { samples, featureNames } = state.dataset;
+  sampleInfo.textContent = `Muestras: ${samples.length}`;
+  featureInfo.textContent = `Features: ${featureNames.length}`;
+  predLabel1.textContent = featureNames[0];
+  predLabel2.textContent = featureNames[1];
 
-// ── DOM refs ──────────────────────────────────
-const datasetSelect = document.getElementById('datasetSelect');
-const trainSplit = document.getElementById('trainSplit');
-const trainSplitLabel = document.getElementById('trainSplitLabel');
-const learningRate = document.getElementById('learningRate');
-const lrLabel = document.getElementById('lrLabel');
-const epochsInput = document.getElementById('epochs');
-const trainBtn = document.getElementById('trainBtn');
-const resetBtn = document.getElementById('resetBtn');
-const predictBtn = document.getElementById('predictBtn');
-const trainingOverlay = document.getElementById('trainingOverlay');
-const epochBadge = document.getElementById('epochBadge');
-const costBadge = document.getElementById('costBadge');
-const panelMetrics = document.getElementById('panelMetrics');
-const panelPredict = document.getElementById('panelPredict');
-const sampleCount = document.getElementById('sampleCount');
-const featureCount = document.getElementById('featureCount');
-
-const metricAccuracy = document.getElementById('metricAccuracy');
-const metricPrecision = document.getElementById('metricPrecision');
-const metricRecall = document.getElementById('metricRecall');
-const metricF1 = document.getElementById('metricF1');
-const cmTN = document.getElementById('cmTN');
-const cmFP = document.getElementById('cmFP');
-const cmFN = document.getElementById('cmFN');
-const cmTP = document.getElementById('cmTP');
-const coefBias = document.getElementById('coefBias');
-const coefW1 = document.getElementById('coefW1');
-const coefW2 = document.getElementById('coefW2');
-const coeffFormula = document.getElementById('coeffFormula');
-const predictResult = document.getElementById('predictResult');
-const predF1 = document.getElementById('predF1');
-const predF2 = document.getElementById('predF2');
-
-// ── Helpers ───────────────────────────────────
-function animateNumber(el, val, decimals = 3) {
-  const target = parseFloat(val);
-  const start = parseFloat(el.textContent) || 0;
-  const dur = 800;
-  const startTime = performance.now();
-
-  function tick(now) {
-    const t = Math.min((now - startTime) / dur, 1);
-    const eased = 1 - Math.pow(1 - t, 3);
-    const current = start + (target - start) * eased;
-    el.textContent = current.toFixed(decimals);
-    if (t < 1) requestAnimationFrame(tick);
-    else el.textContent = target.toFixed(decimals);
+  let xM = Infinity, xX = -Infinity, yM = Infinity, yX = -Infinity;
+  for (const s of samples) {
+    xM = Math.min(xM, s.features[0]); xX = Math.max(xX, s.features[0]);
+    yM = Math.min(yM, s.features[1]); yX = Math.max(yX, s.features[1]);
   }
-  requestAnimationFrame(tick);
+  const xp = (xX - xM) * 0.15 || 0.5, yp = (yX - yM) * 0.15 || 0.5;
+  state.xMin = xM - xp; state.xMax = xX + xp; state.yMin = yM - yp; state.yMax = yX + yp;
+
+  // Set slider ranges to data bounds
+  predSlider1.min = state.xMin; predSlider1.max = state.xMax; predSlider1.value = (state.xMin + state.xMax) / 2;
+  predSlider2.min = state.yMin; predSlider2.max = state.yMax; predSlider2.value = (state.yMin + state.yMax) / 2;
+  predVal1.textContent = parseFloat(predSlider1.value).toFixed(1);
+  predVal2.textContent = parseFloat(predSlider2.value).toFixed(1);
+
+  resetUI();
+  drawBoundary();
+  drawCostChart([]);
 }
 
-function updateDataset() {
-  animate(datasetSelect, { scale: [1, 0.97, 1] }, { duration: 0.25 });
-
-  const name = datasetSelect.value;
-  state.dataset = getDataset(name);
-  state.model = null;
-  state.training = false;
-
-  const { samples, featureNames } = state.dataset;
-  sampleCount.textContent = `Muestras: ${samples.length}`;
-  featureCount.textContent = `Features: ${featureNames.length}`;
-
-  predF1.placeholder = featureNames[0] || 'x₁';
-  predF2.placeholder = featureNames[1] || 'x₂';
-
-  panelMetrics.style.display = 'none';
-  panelPredict.style.display = 'none';
+function resetUI() {
+  metricsPanel.style.display = 'none';
+  predictPanel.style.display = 'none';
   resetBtn.disabled = true;
   trainBtn.disabled = false;
   epochBadge.textContent = '0 épocas';
   costBadge.textContent = 'Costo: —';
-
-  drawBoundary();
+  state.trained = false;
 }
 
-function splitData() {
-  const { samples } = state.dataset;
-  const ratio = parseInt(trainSplit.value) / 100;
-  const shuffled = [...samples];
-  for (let i = shuffled.length - 1; i > 0; i--) {
+// ── Training ───────────────────────────────────
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  const splitIdx = Math.floor(shuffled.length * ratio);
-  state.Xtrain = shuffled.slice(0, splitIdx).map(s => s.features);
-  state.ytrain = shuffled.slice(0, splitIdx).map(s => s.label);
-  state.Xtest = shuffled.slice(splitIdx).map(s => s.features);
-  state.ytest = shuffled.slice(splitIdx).map(s => s.label);
+  return arr;
+}
+
+function doSplit() {
+  const { samples } = state.dataset;
+  const ratio = parseInt(splitRange.value) / 100;
+  const shuffled = shuffle([...samples]);
+  const idx = Math.floor(shuffled.length * ratio);
+  state.Xtrain = shuffled.slice(0, idx).map(s => s.features);
+  state.ytrain = shuffled.slice(0, idx).map(s => s.label);
+  state.Xtest = shuffled.slice(idx).map(s => s.features);
+  state.ytest = shuffled.slice(idx).map(s => s.label);
 }
 
 function computeStats(X) {
-  const m = X[0].length;
-  const means = [], stds = [];
+  const m = X[0].length, means = [], stds = [];
   for (let j = 0; j < m; j++) {
     let sum = 0;
     for (const row of X) sum += row[j];
     means.push(sum / X.length);
   }
   for (let j = 0; j < m; j++) {
-    let sumSq = 0;
-    for (const row of X) sumSq += Math.pow(row[j] - means[j], 2);
-    stds.push(Math.sqrt(sumSq / X.length) || 1);
+    let ss = 0;
+    for (const row of X) ss += Math.pow(row[j] - means[j], 2);
+    stds.push(Math.sqrt(ss / X.length) || 1);
   }
   return { means, stds };
 }
@@ -143,27 +119,23 @@ function standardize(X, means, stds) {
 
 async function trainModel() {
   if (state.training) return;
-
   state.training = true;
   trainBtn.disabled = true;
-  animate(trainBtn, { scale: [1, 0.95, 1] }, { duration: 0.25 });
-  trainingOverlay.classList.add('active');
-  panelMetrics.style.display = 'none';
-  panelPredict.style.display = 'none';
+  overlay.classList.add('active');
+  metricsPanel.style.display = 'none';
+  predictPanel.style.display = 'none';
 
-  splitData();
+  doSplit();
   const stats = computeStats(state.Xtrain);
-  state.means = stats.means;
-  state.stds = stats.stds;
+  state.means = stats.means; state.stds = stats.stds;
   const Xs = standardize(state.Xtrain, state.means, state.stds);
-
-  const lr = parseInt(learningRate.value) / 100;
+  const lr = parseInt(lrRange.value) / 100;
   const epochs = parseInt(epochsInput.value);
   const model = new LogisticRegression();
 
   await new Promise(resolve => {
-    const batchSize = 10;
     let completed = 0;
+    const batchSize = 10;
 
     function step() {
       const end = Math.min(completed + batchSize, epochs);
@@ -179,7 +151,6 @@ async function trainModel() {
           cost += -state.ytrain[i] * Math.log(preds[i] + eps) - (1 - state.ytrain[i]) * Math.log(1 - preds[i] + eps);
         }
         model.costHistory.push(cost / Xs.length);
-
         const dw = new Array(model.weights.length).fill(0);
         let db = 0;
         for (let i = 0; i < Xs.length; i++) {
@@ -191,127 +162,81 @@ async function trainModel() {
         model.bias -= (lr / Xs.length) * db;
       }
       completed = end;
-
       epochBadge.textContent = `${completed} épocas`;
-      if (model.costHistory.length > 0) {
+      if (model.costHistory.length > 0)
         costBadge.textContent = `Costo: ${model.costHistory[model.costHistory.length - 1].toFixed(4)}`;
-      }
       drawCostChart(model.costHistory);
-
-      if (completed < epochs) {
-        setTimeout(step, 30);
-      } else {
-        model.trained = true;
-        state.model = model;
-        state.weights = model.weights;
-        state.bias = model.bias;
-        resolve();
-      }
+      if (completed < epochs) setTimeout(step, 25);
+      else { model.trained = true; state.model = model; resolve(); }
     }
     step();
   });
 
-  trainingOverlay.classList.remove('active');
-  state.training = false;
-  trainBtn.disabled = false;
-  resetBtn.disabled = false;
-
+  overlay.classList.remove('active');
+  state.training = false; state.trained = true;
+  trainBtn.disabled = false; resetBtn.disabled = false;
   drawBoundary();
   showMetrics();
-
-  panelMetrics.style.display = 'block';
-  panelPredict.style.display = 'block';
-
-  // Entrance animation for metrics & prediction
-  animate(panelMetrics, { opacity: [0, 1], y: [20, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1] });
-  animate(panelPredict, { opacity: [0, 1], y: [20, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1], delay: 0.08 });
-
-  // Stagger metric cards
-  animate('.metric-card', { opacity: [0, 1], y: [12, 0], scale: [0.95, 1] }, {
-    duration: 0.35,
-    easing: [0.22, 0.03, 0.26, 1],
-    delay: stagger(0.07, { start: 0.3 })
-  });
+  metricsPanel.style.display = 'block';
+  predictPanel.style.display = 'block';
 }
 
 function showMetrics() {
   const Xs = standardize(state.Xtest, state.means, state.stds);
   const preds = state.model.predict(Xs);
-
   const acc = accuracy(state.ytest, preds);
   const prec = precisionScore(state.ytest, preds);
   const rec = recallScore(state.ytest, preds);
   const f1 = f1Score(state.ytest, preds);
   const cm = confusionMatrix(state.ytest, preds);
 
-  animateNumber(metricAccuracy, acc);
-  animateNumber(metricPrecision, prec);
-  animateNumber(metricRecall, rec);
-  animateNumber(metricF1, f1);
-
-  cmTN.textContent = cm.tn;
-  cmFP.textContent = cm.fp;
-  cmFN.textContent = cm.fn;
-  cmTP.textContent = cm.tp;
-
-  coefBias.textContent = state.model.bias.toFixed(4);
-  coefW1.textContent = state.model.weights[0].toFixed(4);
-  coefW2.textContent = state.model.weights[1].toFixed(4);
+  mAcc.textContent = acc.toFixed(3);
+  mPrec.textContent = prec.toFixed(3);
+  mRec.textContent = rec.toFixed(3);
+  mF1.textContent = f1.toFixed(3);
+  cmTN.textContent = cm.tn; cmFP.textContent = cm.fp;
+  cmFN.textContent = cm.fn; cmTP.textContent = cm.tp;
+  cfBias.textContent = state.model.bias.toFixed(4);
+  cfW1.textContent = state.model.weights[0].toFixed(4);
+  cfW2.textContent = state.model.weights[1].toFixed(4);
 
   const fn = state.dataset.featureNames;
-  coeffFormula.innerHTML = `ŷ = σ(${state.model.bias.toFixed(3)} + ${state.model.weights[0].toFixed(3)}·${fn[0]} + ${state.model.weights[1].toFixed(3)}·${fn[1]})`;
+  cfFormula.innerHTML = `ŷ = σ(${state.model.bias.toFixed(3)} + ${state.model.weights[0].toFixed(3)}·${fn[0]} + ${state.model.weights[1].toFixed(3)}·${fn[1]})`;
 
-  // Pulse animation on confusion cells
-  animate('.cm-cell', { scale: [0.9, 1.05, 1] }, { duration: 0.4, easing: [0.22, 0.03, 0.26, 1], delay: 0.4 });
+  doLivePredict();
 }
 
-// ── Canvas: Decision Boundary ──────────────────
+// ── Canvas: boundary ───────────────────────────
+
+const BW = 500, BH = 400, BPAD = 40;
 
 function drawBoundary() {
-  const W = 500, H = 400;
-  const pad = 40;
-  bCtx.clearRect(0, 0, W, H);
-
+  bCtx.clearRect(0, 0, BW, BH);
   const { samples, featureNames } = state.dataset;
-  if (samples.length === 0) return;
+  if (!samples.length) return;
 
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-  for (const s of samples) {
-    xMin = Math.min(xMin, s.features[0]);
-    xMax = Math.max(xMax, s.features[0]);
-    yMin = Math.min(yMin, s.features[1]);
-    yMax = Math.max(yMax, s.features[1]);
-  }
-  const xPad = (xMax - xMin) * 0.15 || 0.5;
-  const yPad = (yMax - yMin) * 0.15 || 0.5;
-  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
+  const xMin = state.xMin, xMax = state.xMax, yMin = state.yMin, yMax = state.yMax;
+  const sx = (BW - 2 * BPAD) / (xMax - xMin);
+  const sy = (BH - 2 * BPAD) / (yMax - yMin);
+  const toX = v => BPAD + (v - xMin) * sx;
+  const toY = v => BH - BPAD - (v - yMin) * sy;
+  state._sx = sx; state._sy = sy; state._toX = toX; state._toY = toY;
 
-  const sx = (W - 2 * pad) / (xMax - xMin);
-  const sy = (H - 2 * pad) / (yMax - yMin);
-
-  function toX(v) { return pad + (v - xMin) * sx; }
-  function toY(v) { return H - pad - (v - yMin) * sy; }
-
-  // Probability heatmap
-  if (state.model && state.model.trained) {
-    const res = 2;
-    for (let px = 0; px < W; px += res) {
-      for (let py = 0; py < H; py += res) {
-        const x = (px - pad) / sx + xMin;
-        const y = (H - pad - py) / sy + yMin;
+  // Heatmap
+  if (state.trained) {
+    for (let px = 0; px < BW; px += 3) {
+      for (let py = 0; py < BH; py += 3) {
+        const x = (px - BPAD) / sx + xMin;
+        const y = (BH - BPAD - py) / sy + yMin;
         const xs = [(x - state.means[0]) / state.stds[0], (y - state.means[1]) / state.stds[1]];
         let z = state.model.bias;
         for (let j = 0; j < xs.length; j++) z += state.model.weights[j] * xs[j];
         const prob = state.model.sigmoid(z);
-        if (Math.abs(prob - 0.5) < 0.08) {
-          bCtx.fillStyle = `rgba(255,255,255,0.15)`;
-          bCtx.fillRect(px, py, res, res);
-        } else {
-          bCtx.fillStyle = prob > 0.5
-            ? `rgba(244, 114, 182, ${Math.min((prob - 0.5) * 0.15, 0.08)})`
-            : `rgba(34, 211, 238, ${Math.min((0.5 - prob) * 0.15, 0.08)})`;
-          bCtx.fillRect(px, py, res, res);
-        }
+        if (Math.abs(prob - 0.5) < 0.08) bCtx.fillStyle = 'rgba(255,255,255,0.1)';
+        else bCtx.fillStyle = prob > 0.5
+          ? `rgba(244,114,182,${Math.min((prob - 0.5) * 0.15, 0.08)})`
+          : `rgba(34,211,238,${Math.min((0.5 - prob) * 0.15, 0.08)})`;
+        bCtx.fillRect(px, py, 3, 3);
       }
     }
   }
@@ -320,190 +245,183 @@ function drawBoundary() {
   bCtx.strokeStyle = 'rgba(255,255,255,0.04)';
   bCtx.lineWidth = 1;
   for (let v = Math.ceil(xMin); v <= xMax; v++) {
-    bCtx.beginPath(); bCtx.moveTo(toX(v), pad); bCtx.lineTo(toX(v), H - pad); bCtx.stroke();
+    bCtx.beginPath(); bCtx.moveTo(toX(v), BPAD); bCtx.lineTo(toX(v), BH - BPAD); bCtx.stroke();
   }
   for (let v = Math.ceil(yMin); v <= yMax; v++) {
-    bCtx.beginPath(); bCtx.moveTo(pad, toY(v)); bCtx.lineTo(W - pad, toY(v)); bCtx.stroke();
+    bCtx.beginPath(); bCtx.moveTo(BPAD, toY(v)); bCtx.lineTo(BW - BPAD, toY(v)); bCtx.stroke();
   }
-
-  // Axes
-  bCtx.strokeStyle = 'rgba(255,255,255,0.12)';
+  bCtx.strokeStyle = 'rgba(255,255,255,0.1)';
   bCtx.lineWidth = 1;
-  if (0 >= xMin && 0 <= xMax) {
-    bCtx.beginPath(); bCtx.moveTo(toX(0), pad); bCtx.lineTo(toX(0), H - pad); bCtx.stroke();
-  }
-  if (0 >= yMin && 0 <= yMax) {
-    bCtx.beginPath(); bCtx.moveTo(pad, toY(0)); bCtx.lineTo(W - pad, toY(0)); bCtx.stroke();
-  }
+  if (0 >= xMin && 0 <= xMax) { bCtx.beginPath(); bCtx.moveTo(toX(0), BPAD); bCtx.lineTo(toX(0), BH - BPAD); bCtx.stroke(); }
+  if (0 >= yMin && 0 <= yMax) { bCtx.beginPath(); bCtx.moveTo(BPAD, toY(0)); bCtx.lineTo(BW - BPAD, toY(0)); bCtx.stroke(); }
 
-  // Data points
+  // Points
   for (const s of samples) {
-    const cx = toX(s.features[0]);
-    const cy = toY(s.features[1]);
+    const cx = toX(s.features[0]), cy = toY(s.features[1]);
     const color = state.colors[s.label];
-    const r = 5;
-
-    bCtx.shadowColor = color;
-    bCtx.shadowBlur = 8;
+    bCtx.shadowColor = color; bCtx.shadowBlur = 7;
     bCtx.fillStyle = color;
-    bCtx.beginPath();
-    bCtx.arc(cx, cy, r, 0, Math.PI * 2);
-    bCtx.fill();
+    bCtx.beginPath(); bCtx.arc(cx, cy, 5, 0, Math.PI * 2); bCtx.fill();
     bCtx.shadowBlur = 0;
-
-    bCtx.strokeStyle = 'rgba(255,255,255,0.3)';
-    bCtx.lineWidth = 1;
-    bCtx.stroke();
+    bCtx.strokeStyle = 'rgba(255,255,255,0.25)'; bCtx.lineWidth = 1; bCtx.stroke();
   }
 
-  // Axis labels
-  bCtx.fillStyle = 'rgba(255,255,255,0.2)';
+  // Labels
+  bCtx.fillStyle = 'rgba(255,255,255,0.18)';
+  bCtx.font = '9px Inter, sans-serif';
+  bCtx.textAlign = 'center'; bCtx.textBaseline = 'top';
+  for (let v = Math.ceil(xMin); v <= xMax; v++) { if (v === 0) continue; bCtx.fillText(v, toX(v), toY(0) + 6); }
+  bCtx.textAlign = 'right'; bCtx.textBaseline = 'middle';
+  for (let v = Math.ceil(yMin); v <= yMax; v++) { if (v === 0) continue; bCtx.fillText(v, toX(0) - 7, toY(v)); }
+  bCtx.fillStyle = 'rgba(255,255,255,0.25)';
   bCtx.font = '10px Inter, sans-serif';
-  bCtx.textAlign = 'center';
-  bCtx.textBaseline = 'top';
-  for (let v = Math.ceil(xMin); v <= xMax; v++) {
-    if (v === 0) continue;
-    bCtx.fillText(v, toX(v), toY(0) + 6);
-  }
-  bCtx.textAlign = 'right';
-  bCtx.textBaseline = 'middle';
-  for (let v = Math.ceil(yMin); v <= yMax; v++) {
-    if (v === 0) continue;
-    bCtx.fillText(v, toX(0) - 8, toY(v));
-  }
-
-  bCtx.fillStyle = 'rgba(255,255,255,0.3)';
-  bCtx.font = '11px Inter, sans-serif';
-  bCtx.textAlign = 'left';
-  bCtx.textBaseline = 'bottom';
-  bCtx.fillText(featureNames[0], W - pad, toY(0) - 2);
-  bCtx.textAlign = 'center';
-  bCtx.textBaseline = 'bottom';
-  bCtx.fillText(featureNames[1], toX(0), pad - 2);
+  bCtx.textAlign = 'left'; bCtx.textBaseline = 'bottom';
+  bCtx.fillText(featureNames[0], BW - BPAD, toY(0) - 2);
+  bCtx.textAlign = 'center'; bCtx.textBaseline = 'bottom';
+  bCtx.fillText(featureNames[1], toX(0), BPAD - 2);
 }
 
-// ── Canvas: Cost Chart ─────────────────────────
+// ── Canvas: cost chart ─────────────────────────
 
-function drawCostChart(costHistory) {
-  const W = 500, H = 300;
-  const pad = 40;
-  cCtx.clearRect(0, 0, W, H);
+const CW = 500, CH = 300, CPAD = 40;
 
-  if (costHistory.length < 2) return;
+function drawCostChart(history) {
+  cCtx.clearRect(0, 0, CW, CH);
+  if (history.length < 2) return;
 
-  const minCost = Math.min(...costHistory);
-  const maxCost = Math.max(...costHistory);
-  const cRange = Math.max(maxCost - minCost, 0.01);
-  const yMinC = Math.max(0, minCost - cRange * 0.1);
-  const yMaxC = maxCost + cRange * 0.1;
-  const xMaxE = costHistory.length - 1;
-
-  const sx = (W - 2 * pad) / Math.max(xMaxE, 1);
-  const sy = (H - 2 * pad) / Math.max(yMaxC - yMinC, 0.01);
-
-  function toCx(v) { return pad + v * sx; }
-  function toCy(v) { return H - pad - (v - yMinC) * sy; }
+  const minC = Math.min(...history), maxC = Math.max(...history), range = Math.max(maxC - minC, 0.01);
+  const yBot = Math.max(0, minC - range * 0.1), yTop = maxC + range * 0.1;
+  const maxE = history.length - 1;
+  const sx = (CW - 2 * CPAD) / Math.max(maxE, 1);
+  const sy = (CH - 2 * CPAD) / Math.max(yTop - yBot, 0.01);
+  const toX = v => CPAD + v * sx;
+  const toY = v => CH - CPAD - (v - yBot) * sy;
 
   // Grid
   cCtx.strokeStyle = 'rgba(255,255,255,0.04)';
   cCtx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
-    const y = yMinC + (yMaxC - yMinC) * i / 4;
-    cCtx.beginPath(); cCtx.moveTo(pad, toCy(y)); cCtx.lineTo(W - pad, toCy(y)); cCtx.stroke();
+    const y = yBot + (yTop - yBot) * i / 4;
+    cCtx.beginPath(); cCtx.moveTo(CPAD, toY(y)); cCtx.lineTo(CW - CPAD, toY(y)); cCtx.stroke();
   }
 
-  // Fill under curve
+  // Fill
   cCtx.beginPath();
-  cCtx.moveTo(toCx(0), H - pad);
-  for (let i = 0; i < costHistory.length; i++) {
-    cCtx.lineTo(toCx(i), toCy(costHistory[i]));
-  }
-  cCtx.lineTo(toCx(xMaxE), H - pad);
+  cCtx.moveTo(toX(0), CH - CPAD);
+  for (let i = 0; i < history.length; i++) cCtx.lineTo(toX(i), toY(history[i]));
+  cCtx.lineTo(toX(maxE), CH - CPAD);
   cCtx.closePath();
-  cCtx.fillStyle = 'rgba(135, 91, 247, 0.08)';
+  cCtx.fillStyle = 'rgba(124,58,237,0.07)';
   cCtx.fill();
 
   // Curve
-  cCtx.strokeStyle = '#875bf7';
+  cCtx.strokeStyle = '#7c3aed';
   cCtx.lineWidth = 2;
-  cCtx.shadowColor = '#875bf7';
-  cCtx.shadowBlur = 10;
+  cCtx.shadowColor = '#7c3aed'; cCtx.shadowBlur = 8;
   cCtx.beginPath();
-  for (let i = 0; i < costHistory.length; i++) {
-    if (i === 0) cCtx.moveTo(toCx(i), toCy(costHistory[i]));
-    else cCtx.lineTo(toCx(i), toCy(costHistory[i]));
+  for (let i = 0; i < history.length; i++) {
+    i === 0 ? cCtx.moveTo(toX(i), toY(history[i])) : cCtx.lineTo(toX(i), toY(history[i]));
   }
   cCtx.stroke();
   cCtx.shadowBlur = 0;
 
   // Labels
-  cCtx.fillStyle = 'rgba(255,255,255,0.22)';
-  cCtx.font = '10px Inter, sans-serif';
-  cCtx.textAlign = 'right';
-  cCtx.textBaseline = 'middle';
-  cCtx.fillText(yMaxC.toFixed(2), pad - 6, toCy(yMaxC));
-  cCtx.fillText(yMinC.toFixed(2), pad - 6, toCy(yMinC));
-  cCtx.textAlign = 'center';
-  cCtx.textBaseline = 'top';
-  cCtx.fillText(`${xMaxE} épocas`, toCx(xMaxE), H - pad + 6);
-  cCtx.fillText('0', pad, H - pad + 6);
+  cCtx.fillStyle = 'rgba(255,255,255,0.2)';
+  cCtx.font = '9px Inter, sans-serif';
+  cCtx.textAlign = 'right'; cCtx.textBaseline = 'middle';
+  cCtx.fillText(yTop.toFixed(2), CPAD - 5, toY(yTop));
+  cCtx.fillText(yBot.toFixed(2), CPAD - 5, toY(yBot));
+  cCtx.textAlign = 'center'; cCtx.textBaseline = 'top';
+  cCtx.fillText(`${maxE} épocas`, toX(maxE), CH - CPAD + 5);
+  cCtx.fillText('0', CPAD, CH - CPAD + 5);
 }
 
 // ── Prediction ─────────────────────────────────
 
-function predict() {
-  if (!state.model || !state.model.trained) return;
-
-  animate(predictBtn, { scale: [1, 0.95, 1] }, { duration: 0.2 });
-
-  const f1 = parseFloat(predF1.value);
-  const f2 = parseFloat(predF2.value);
-  if (isNaN(f1) || isNaN(f2)) {
-    predictResult.innerHTML = '<div class="result-placeholder">Ingresá ambos valores</div>';
-    return;
-  }
-
+function doLivePredict() {
+  if (!state.trained) return;
+  const f1 = parseFloat(predSlider1.value);
+  const f2 = parseFloat(predSlider2.value);
   const xs = [(f1 - state.means[0]) / state.stds[0], (f2 - state.means[1]) / state.stds[1]];
   let z = state.model.bias;
   for (let j = 0; j < xs.length; j++) z += state.model.weights[j] * xs[j];
   const prob = state.model.sigmoid(z);
-  const predClass = prob >= 0.5 ? 1 : 0;
-  const className = state.dataset.classNames[predClass];
-  const color = state.colors[predClass];
+  const cls = prob >= 0.5 ? 1 : 0;
+  const name = state.dataset.classNames[cls];
+  const color = state.colors[cls];
+  const pct = (prob >= 0.5 ? prob : 1 - prob) * 100;
 
-  predictResult.innerHTML = `
-    <div class="result-content">
-      <div class="result-class" style="color:${color}">${className}</div>
-      <div class="result-prob">Probabilidad: <span>${(prob >= 0.5 ? prob : 1 - prob).toFixed(1)}%</span></div>
+  predOut.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:1.2rem;font-weight:700;color:${color}">${name}</div>
+      <div style="font-size:0.85rem;color:var(--text2)">Confianza: <strong style="color:var(--accent2);font-family:var(--mono)">${pct.toFixed(1)}%</strong></div>
     </div>
   `;
-
-  animate(predictResult, { scale: [0.96, 1], opacity: [0, 1] }, { duration: 0.3, easing: [0.22, 0.03, 0.26, 1] });
 }
 
-// ── Event listeners ────────────────────────────
+function predictAtPoint(x, y) {
+  if (!state.trained) return;
+  predSlider1.value = Math.min(state.xMax, Math.max(state.xMin, x));
+  predSlider2.value = Math.min(state.yMax, Math.max(state.yMin, y));
+  predVal1.textContent = parseFloat(predSlider1.value).toFixed(1);
+  predVal2.textContent = parseFloat(predSlider2.value).toFixed(1);
+  doLivePredict();
+}
 
-datasetSelect.addEventListener('change', updateDataset);
-trainSplit.addEventListener('input', () => {
-  trainSplitLabel.textContent = trainSplit.value;
+// ── Canvas interaction ─────────────────────────
+
+bCanvas.addEventListener('mousemove', e => {
+  const rect = bCanvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) / rect.width * BW;
+  const py = (e.clientY - rect.top) / rect.height * BH;
+  const toX = state._toX, toY = state._toY;
+  if (!toX) return;
+  // Reverse map to data coords
+  const x = (px - BPAD) / state._sx + state.xMin;
+  const y = (BH - BPAD - py) / state._sy + state.yMin;
+  if (x < state.xMin || x > state.xMax || y < state.yMin || y > state.yMax) {
+    tooltip.classList.remove('show');
+    return;
+  }
+
+  tooltip.style.left = (px + 12) + 'px';
+  tooltip.style.top = (py - 10) + 'px';
+  tooltip.textContent = `(${x.toFixed(2)}, ${y.toFixed(2)})`;
+  tooltip.classList.add('show');
 });
-learningRate.addEventListener('input', () => {
-  lrLabel.textContent = (parseInt(learningRate.value) / 100).toFixed(2);
+
+bCanvas.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+
+bCanvas.addEventListener('click', e => {
+  const rect = bCanvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) / rect.width * BW;
+  const py = (e.clientY - rect.top) / rect.height * BH;
+  const x = (px - BPAD) / state._sx + state.xMin;
+  const y = (BH - BPAD - py) / state._sy + state.yMin;
+  predictAtPoint(x, y);
 });
+
+// ── Events ─────────────────────────────────────
+
+datasetSel.addEventListener('change', loadDataset);
+splitRange.addEventListener('input', () => { splitLabel.textContent = splitRange.value; });
+lrRange.addEventListener('input', () => { lrLabel.textContent = (parseInt(lrRange.value) / 100).toFixed(2); });
 trainBtn.addEventListener('click', trainModel);
 resetBtn.addEventListener('click', () => {
-  state.model = null;
-  panelMetrics.style.display = 'none';
-  panelPredict.style.display = 'none';
-  resetBtn.disabled = true;
-  epochBadge.textContent = '0 épocas';
-  costBadge.textContent = 'Costo: —';
-  drawBoundary();
-  cCtx.clearRect(0, 0, costCanvas.width, costCanvas.height);
+  state.model = null; state.trained = false;
+  resetUI();
+  drawBoundary(); drawCostChart([]);
 });
-predictBtn.addEventListener('click', predict);
+predSlider1.addEventListener('input', () => {
+  predVal1.textContent = parseFloat(predSlider1.value).toFixed(1);
+  doLivePredict();
+});
+predSlider2.addEventListener('input', () => {
+  predVal2.textContent = parseFloat(predSlider2.value).toFixed(1);
+  doLivePredict();
+});
 
 // ── Init ───────────────────────────────────────
 
-updateDataset();
+loadDataset();
 drawCostChart([]);

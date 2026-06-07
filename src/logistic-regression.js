@@ -10,20 +10,9 @@ export class LogisticRegression {
     return 1 / (1 + Math.exp(-Math.max(-100, Math.min(100, z))));
   }
 
-  standardize(X, means, stds) {
-    const m = X[0].length;
-    return X.map(row =>
-      row.map((val, j) => {
-        const std = stds[j] || 1;
-        return (val - means[j]) / std;
-      })
-    );
-  }
-
   fit(X, y, { learningRate = 0.1, epochs = 1000 } = {}) {
     const n = X.length;
     const m = X[0].length;
-
     this.weights = new Array(m).fill(0);
     this.bias = 0;
     this.costHistory = [];
@@ -32,34 +21,25 @@ export class LogisticRegression {
       const preds = new Array(n);
       for (let i = 0; i < n; i++) {
         let z = this.bias;
-        for (let j = 0; j < m; j++) {
-          z += this.weights[j] * X[i][j];
-        }
+        for (let j = 0; j < m; j++) z += this.weights[j] * X[i][j];
         preds[i] = this.sigmoid(z);
       }
-
       let cost = 0;
       for (let i = 0; i < n; i++) {
         const eps = 1e-12;
         cost += -y[i] * Math.log(preds[i] + eps) - (1 - y[i]) * Math.log(1 - preds[i] + eps);
       }
       this.costHistory.push(cost / n);
-
       const dw = new Array(m).fill(0);
       let db = 0;
       for (let i = 0; i < n; i++) {
-        const error = preds[i] - y[i];
-        for (let j = 0; j < m; j++) {
-          dw[j] += error * X[i][j];
-        }
-        db += error;
+        const err = preds[i] - y[i];
+        for (let j = 0; j < m; j++) dw[j] += err * X[i][j];
+        db += err;
       }
-      for (let j = 0; j < m; j++) {
-        this.weights[j] -= (learningRate / n) * dw[j];
-      }
+      for (let j = 0; j < m; j++) this.weights[j] -= (learningRate / n) * dw[j];
       this.bias -= (learningRate / n) * db;
     }
-
     this.trained = true;
     return this;
   }
@@ -68,9 +48,7 @@ export class LogisticRegression {
     if (!this.trained) throw new Error('Modelo no entrenado');
     return X.map(x => {
       let z = this.bias;
-      for (let j = 0; j < this.weights.length; j++) {
-        z += this.weights[j] * x[j];
-      }
+      for (let j = 0; j < this.weights.length; j++) z += this.weights[j] * x[j];
       return this.sigmoid(z);
     });
   }
@@ -81,12 +59,9 @@ export class LogisticRegression {
 }
 
 export function accuracy(yTrue, yPred) {
-  const n = yTrue.length;
-  let correct = 0;
-  for (let i = 0; i < n; i++) {
-    if (yTrue[i] === yPred[i]) correct++;
-  }
-  return correct / n;
+  let c = 0;
+  for (let i = 0; i < yTrue.length; i++) if (yTrue[i] === yPred[i]) c++;
+  return c / yTrue.length;
 }
 
 export function confusionMatrix(yTrue, yPred) {

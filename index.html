@@ -10,158 +10,130 @@
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-  <div class="app" id="app">
-    <header class="header" id="header">
-      <div class="logo">
-        <span class="logo-icon">&#9670;</span>
+  <div class="app">
+    <header class="header">
+      <div class="header-row">
+        <span class="logo">&#9670;</span>
         <h1 class="title">Classifica</h1>
       </div>
-      <p class="subtitle">Regresi&oacute;n Log&iacute;stica &middot; Entrenamiento, Evaluaci&oacute;n y Predicci&oacute;n</p>
+      <p class="subtitle">Regresión Logística — Entrenamiento, Evaluación y Predicción en vivo</p>
     </header>
 
-    <section class="control-bar" id="controlBar">
-      <div class="control-group">
-        <label for="datasetSelect">Dataset</label>
-        <select id="datasetSelect">
-          <option value="synthetic">Sint&eacute;tico 2D</option>
+    <div class="controls">
+      <div class="c-group">
+        <label>Dataset</label>
+        <select id="datasetSel">
+          <option value="synthetic">Sintético 2D</option>
           <option value="iris">Iris (Setosa vs Versicolor)</option>
         </select>
       </div>
-      <div class="control-group">
-        <label for="trainSplit">Train <span id="trainSplitLabel">80</span>%</label>
-        <input type="range" id="trainSplit" min="50" max="90" value="80" step="5">
+      <div class="c-group">
+        <label>Train <span id="splitLabel">80</span>%</label>
+        <input type="range" id="splitRange" min="50" max="90" value="80" step="5">
       </div>
-      <div class="control-group">
-        <label for="learningRate">&alpha; <span id="lrLabel">0.1</span></label>
-        <input type="range" id="learningRate" min="1" max="50" value="10" step="1">
+      <div class="c-group">
+        <label>α <span id="lrLabel">0.10</span></label>
+        <input type="range" id="lrRange" min="1" max="50" value="10" step="1">
       </div>
-      <div class="control-group">
-        <label for="epochs">&Eacute;pocas</label>
-        <input type="number" id="epochs" value="500" min="50" max="5000" step="50">
+      <div class="c-group">
+        <label>Épocas</label>
+        <input type="number" id="epochsInput" value="500" min="50" max="5000" step="50">
       </div>
-      <button class="btn btn-train" id="trainBtn" data-label="Entrenar modelo">
-        <span class="btn-icon">&#9654;</span>
-        <span class="btn-text">Entrenar</span>
-      </button>
-      <button class="btn btn-reset" id="resetBtn" disabled>
-        <span class="btn-icon">&#8635;</span>
-      </button>
-    </section>
+      <button class="btn primary" id="trainBtn">▶ Entrenar</button>
+      <button class="btn secondary" id="resetBtn" disabled>↺</button>
+    </div>
 
-    <section class="sample-info" id="sampleInfo">
-      <span id="sampleCount">Muestras: 0</span>
-      <span class="info-divider-v"></span>
-      <span id="featureCount">Features: 2</span>
-      <span class="info-divider-v"></span>
-      <span class="class-legend">
-        <span class="legend-dot dot-0"></span> Clase 0
-        <span class="legend-dot dot-1"></span> Clase 1
-      </span>
-    </section>
+    <div class="bar">
+      <span id="sampleInfo">Muestras: 0</span>
+      <span class="sep"></span>
+      <span id="featureInfo">Features: 2</span>
+      <span class="sep"></span>
+      <span><span class="dot c0"></span> Clase 0</span>
+      <span><span class="dot c1"></span> Clase 1</span>
+    </div>
 
-    <div class="main-grid">
-      <section class="panel panel-boundary" id="panelBoundary">
-        <div class="panel-header">
-          <h2>Frontera de Decisi&oacute;n</h2>
-          <span class="panel-badge" id="epochBadge">0 &eacute;pocas</span>
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-h">
+          <h2>Frontera de Decisión</h2>
+          <span class="badge" id="epochBadge">0 épocas</span>
         </div>
-        <div class="canvas-wrap">
+        <div class="canvas-box">
           <canvas id="boundaryCanvas" width="500" height="400"></canvas>
-          <div class="canvas-overlay" id="trainingOverlay">
+          <div class="overlay" id="trainOverlay">
             <div class="spinner"></div>
-            <span>Entrenando...</span>
+            <span>Entrenando…</span>
           </div>
+          <div class="tooltip" id="canvasTooltip"></div>
         </div>
       </section>
 
-      <section class="panel panel-cost" id="panelCost">
-        <div class="panel-header">
+      <section class="panel">
+        <div class="panel-h">
           <h2>Costo de Entrenamiento</h2>
-          <span class="panel-badge" id="costBadge">Costo: —</span>
+          <span class="badge" id="costBadge">Costo: —</span>
         </div>
-        <div class="canvas-wrap">
+        <div class="canvas-box">
           <canvas id="costCanvas" width="500" height="300"></canvas>
         </div>
       </section>
     </div>
 
-    <section class="panel panel-metrics" id="panelMetrics" style="display:none">
-      <div class="panel-header">
-        <h2>M&eacute;tricas de Evaluaci&oacute;n</h2>
+    <section class="panel" id="metricsPanel" style="display:none">
+      <div class="panel-h">
+        <h2>Métricas de Evaluación</h2>
       </div>
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-value" id="metricAccuracy">—</div>
-          <div class="metric-label">Accuracy</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-value" id="metricPrecision">—</div>
-          <div class="metric-label">Precision</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-value" id="metricRecall">—</div>
-          <div class="metric-label">Recall</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-value" id="metricF1">—</div>
-          <div class="metric-label">F1-Score</div>
-        </div>
+      <div class="m-grid">
+        <div class="m-card"><div class="m-val" id="mAcc">—</div><div class="m-lbl">Accuracy</div></div>
+        <div class="m-card"><div class="m-val" id="mPrec">—</div><div class="m-lbl">Precision</div></div>
+        <div class="m-card"><div class="m-val" id="mRec">—</div><div class="m-lbl">Recall</div></div>
+        <div class="m-card"><div class="m-val" id="mF1">—</div><div class="m-lbl">F1-Score</div></div>
       </div>
-      <div class="metrics-detail">
-        <div class="confusion-matrix" id="confusionMatrix">
-          <h3>Matriz de Confusi&oacute;n</h3>
-          <div class="cm-grid">
-            <div></div>
-            <div class="cm-header">Pred 0</div>
-            <div class="cm-header">Pred 1</div>
-            <div class="cm-header">Real 0</div>
-            <div class="cm-cell tn" id="cmTN">0</div>
-            <div class="cm-cell fp" id="cmFP">0</div>
-            <div class="cm-header">Real 1</div>
-            <div class="cm-cell fn" id="cmFN">0</div>
-            <div class="cm-cell tp" id="cmTP">0</div>
+      <div class="m-detail">
+        <div>
+          <h3>Matriz de Confusión</h3>
+          <div class="cm">
+            <div></div><div class="cm-h">Pred 0</div><div class="cm-h">Pred 1</div>
+            <div class="cm-h">Real 0</div><div class="cm-c tn" id="cmTN">0</div><div class="cm-c fp" id="cmFP">0</div>
+            <div class="cm-h">Real 1</div><div class="cm-c fn" id="cmFN">0</div><div class="cm-c tp" id="cmTP">0</div>
           </div>
         </div>
-        <div class="coefficients" id="coeffPanel">
-          <h3>Coeficientes del Modelo</h3>
-          <div class="coeff-formula" id="coeffFormula">y = &beta;&#8320; + &beta;&#8321;x&#8321; + &beta;&#8322;x&#8322;</div>
-          <div class="coeff-list" id="coeffList">
-            <div class="coeff-item"><span class="coeff-name">&beta;&#8320; (bias)</span><span class="coeff-val" id="coefBias">—</span></div>
-            <div class="coeff-item"><span class="coeff-name">&beta;&#8321;</span><span class="coeff-val" id="coefW1">—</span></div>
-            <div class="coeff-item"><span class="coeff-name">&beta;&#8322;</span><span class="coeff-val" id="coefW2">—</span></div>
+        <div class="coeffs">
+          <h3>Coeficientes</h3>
+          <div class="cf-f" id="cfFormula">y = β₀ + β₁x₁ + β₂x₂</div>
+          <div class="cf-list">
+            <div class="cf-row"><span>β₀ (bias)</span><span class="cf-v" id="cfBias">—</span></div>
+            <div class="cf-row"><span>β₁</span><span class="cf-v" id="cfW1">—</span></div>
+            <div class="cf-row"><span>β₂</span><span class="cf-v" id="cfW2">—</span></div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="panel panel-predict" id="panelPredict" style="display:none">
-      <div class="panel-header">
-        <h2>Predecir Nuevos Datos</h2>
+    <section class="panel" id="predictPanel" style="display:none">
+      <div class="panel-h">
+        <h2>Predicción en Vivo</h2>
       </div>
-      <div class="predict-form">
-        <div class="predict-inputs">
-          <div class="control-group">
-            <label for="predF1">x&#8321;</label>
-            <input type="number" id="predF1" step="0.1" placeholder="0.0">
+      <div class="pred-body">
+        <div class="pred-sliders">
+          <div class="pred-group">
+            <label id="predLabel1">x₁</label>
+            <input type="range" id="predSlider1" min="0" max="10" step="0.1" value="5">
+            <span class="pred-val" id="predVal1">5.0</span>
           </div>
-          <div class="control-group">
-            <label for="predF2">x&#8322;</label>
-            <input type="number" id="predF2" step="0.1" placeholder="0.0">
+          <div class="pred-group">
+            <label id="predLabel2">x₂</label>
+            <input type="range" id="predSlider2" min="0" max="10" step="0.1" value="5">
+            <span class="pred-val" id="predVal2">5.0</span>
           </div>
-          <button class="btn btn-predict" id="predictBtn">
-            <span class="btn-icon">&#9654;</span>
-            <span class="btn-text">Predecir</span>
-          </button>
         </div>
-        <div class="predict-result" id="predictResult">
-          <div class="result-placeholder">Ajust&aacute; los valores y presion&aacute; Predecir</div>
+        <div class="pred-out" id="predOut">
+          <div class="pred-ph">Ajustá los sliders para predecir en vivo</div>
         </div>
       </div>
     </section>
 
-    <footer class="footer">
-      <p>Classifica &mdash; Proyecto educativo &middot; Regresi&oacute;n Log&iacute;stica desde cero</p>
-    </footer>
+    <footer class="footer">Classifica — Proyecto educativo · Regresión Logística desde cero</footer>
   </div>
 
   <script type="module" src="/src/main.js"></script>
