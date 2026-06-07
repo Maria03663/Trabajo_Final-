@@ -1,0 +1,15 @@
+name: trabajo-final
+region: nyc
+static_sites:
+  - name: web
+    github:
+      branch: main
+      repo: Maria03663/Trabajo_Final-
+    source_dir: /
+    build_command: npm run build
+    output_dir: dist
+    routes:
+      - path: /
+    envs:
+      - key: NODE_VERSION
+        value: "20"
