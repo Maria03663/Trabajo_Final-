@@ -32,7 +32,7 @@ function draw() {
   const b = parseFloat(interceptInput.value) || 0;
 
   // Grid
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+  ctx.strokeStyle = 'rgba(100, 140, 200, 0.08)';
   ctx.lineWidth = 1;
   for (let x = Math.ceil(xMin); x <= xMax; x++) {
     if (x === 0) continue;
@@ -50,7 +50,9 @@ function draw() {
   }
 
   // Axes
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+  ctx.shadowColor = 'rgba(100, 180, 255, 0.3)';
+  ctx.shadowBlur = 6;
+  ctx.strokeStyle = 'rgba(100, 180, 255, 0.5)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(pad, toCanvasY(0));
@@ -60,9 +62,10 @@ function draw() {
   ctx.moveTo(toCanvasX(0), pad);
   ctx.lineTo(toCanvasX(0), H - pad);
   ctx.stroke();
+  ctx.shadowBlur = 0;
 
   // Axis arrows
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+  ctx.fillStyle = 'rgba(100, 180, 255, 0.5)';
   ctx.beginPath();
   ctx.moveTo(W - pad, toCanvasY(0));
   ctx.lineTo(W - pad - 8, toCanvasY(0) - 4);
@@ -75,7 +78,7 @@ function draw() {
   ctx.fill();
 
   // Axis labels
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  ctx.fillStyle = 'rgba(150, 200, 255, 0.7)';
   ctx.font = '11px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -91,7 +94,7 @@ function draw() {
   }
 
   // Axis labels
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  ctx.fillStyle = 'rgba(100, 180, 255, 0.6)';
   ctx.font = '12px Inter, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
@@ -101,13 +104,15 @@ function draw() {
   ctx.fillText('y', toCanvasX(0), pad + 2);
 
   // Origin
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+  ctx.fillStyle = 'rgba(100, 180, 255, 0.5)';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.font = '11px Inter, sans-serif';
   ctx.fillText('O', toCanvasX(0) - 8, toCanvasY(0) + 8);
 
-  // Line
+  // Line with glow
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
@@ -119,16 +124,20 @@ function draw() {
     ctx.lineTo(toCanvasX(x2), toCanvasY(y2));
     ctx.stroke();
   }
+  ctx.shadowBlur = 0;
 
   // Highlight intercept
   const bCanvasY = toCanvasY(b);
   if (b >= yMin && b <= yMax) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(toCanvasX(0), bCanvasY, 6, 0, Math.PI * 2);
+    ctx.arc(toCanvasX(0), bCanvasY, 7, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 2;
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
   }
 
@@ -136,7 +145,7 @@ function draw() {
   const mStr = m.toFixed(2);
   const bStr = b.toFixed(2);
   const sign = b >= 0 ? '+' : '-';
-  formulaDisplay.textContent = `y = ${mStr}x ${sign} ${Math.abs(b).toFixed(2)}`;
+  formulaDisplay.innerHTML = `y = <span style="color:#22d3ee">${mStr}</span>x ${sign} <span style="color:#a78bfa">${Math.abs(bStr)}</span>`;
   mDisplay.textContent = mStr;
   bDisplay.textContent = bStr;
   coordDisplay.textContent = `(0, ${bStr})`;
