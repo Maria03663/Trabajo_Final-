@@ -1,4 +1,4 @@
-import { animate } from 'motion';
+import { animate, stagger } from 'motion';
 import { LogisticRegression, accuracy, confusionMatrix, precisionScore, recallScore, f1Score } from './logistic-regression.js';
 import { getDataset } from './datasets.js';
 
@@ -20,13 +20,16 @@ const bCtx = boundaryCanvas.getContext('2d');
 const costCanvas = document.getElementById('costCanvas');
 const cCtx = costCanvas.getContext('2d');
 
-// Motion animations
-animate('#header', { opacity: [0, 1], y: [20, 0] }, { duration: 0.5, easing: [0.25, 0.1, 0.25, 1], delay: 0 });
-animate('#controlBar', { opacity: [0, 1], y: [16, 0] }, { duration: 0.5, easing: [0.25, 0.1, 0.25, 1], delay: 0.12 });
-animate('#sampleInfo', { opacity: [0, 1], y: [12, 0] }, { duration: 0.5, easing: [0.25, 0.1, 0.25, 1], delay: 0.2 });
-animate('.main-grid', { opacity: [0, 1], y: [24, 0] }, { duration: 0.5, easing: [0.25, 0.1, 0.25, 1], delay: 0.3 });
+// ── Motion entrance animations ────────────────
+animate('#header', { opacity: [0, 1], y: [24, 0] }, { duration: 0.55, easing: [0.22, 0.03, 0.26, 1], delay: 0 });
+animate('#controlBar', { opacity: [0, 1], y: [18, 0] }, { duration: 0.5, easing: [0.22, 0.03, 0.26, 1], delay: 0.1 });
+animate('#sampleInfo', { opacity: [0, 1], y: [12, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1], delay: 0.18 });
+animate('.main-grid', { opacity: [0, 1], y: [28, 0] }, { duration: 0.55, easing: [0.22, 0.03, 0.26, 1], delay: 0.28 });
 
-// DOM refs
+// Micro‑animation on control bar children
+animate('.control-group', { opacity: [0, 1], y: [10, 0] }, { duration: 0.35, easing: [0.22, 0.03, 0.26, 1], delay: stagger(0.06, { from: 'first', start: 0.15 }) });
+
+// ── DOM refs ──────────────────────────────────
 const datasetSelect = document.getElementById('datasetSelect');
 const trainSplit = document.getElementById('trainSplit');
 const trainSplitLabel = document.getElementById('trainSplitLabel');
@@ -44,7 +47,6 @@ const panelPredict = document.getElementById('panelPredict');
 const sampleCount = document.getElementById('sampleCount');
 const featureCount = document.getElementById('featureCount');
 
-// Metric displays
 const metricAccuracy = document.getElementById('metricAccuracy');
 const metricPrecision = document.getElementById('metricPrecision');
 const metricRecall = document.getElementById('metricRecall');
@@ -61,7 +63,27 @@ const predictResult = document.getElementById('predictResult');
 const predF1 = document.getElementById('predF1');
 const predF2 = document.getElementById('predF2');
 
+// ── Helpers ───────────────────────────────────
+function animateNumber(el, val, decimals = 3) {
+  const target = parseFloat(val);
+  const start = parseFloat(el.textContent) || 0;
+  const dur = 800;
+  const startTime = performance.now();
+
+  function tick(now) {
+    const t = Math.min((now - startTime) / dur, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const current = start + (target - start) * eased;
+    el.textContent = current.toFixed(decimals);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = target.toFixed(decimals);
+  }
+  requestAnimationFrame(tick);
+}
+
 function updateDataset() {
+  animate(datasetSelect, { scale: [1, 0.97, 1] }, { duration: 0.25 });
+
   const name = datasetSelect.value;
   state.dataset = getDataset(name);
   state.model = null;
@@ -93,13 +115,10 @@ function splitData() {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   const splitIdx = Math.floor(shuffled.length * ratio);
-  const train = shuffled.slice(0, splitIdx);
-  const test = shuffled.slice(splitIdx);
-
-  state.Xtrain = train.map(s => s.features);
-  state.ytrain = train.map(s => s.label);
-  state.Xtest = test.map(s => s.features);
-  state.ytest = test.map(s => s.label);
+  state.Xtrain = shuffled.slice(0, splitIdx).map(s => s.features);
+  state.ytrain = shuffled.slice(0, splitIdx).map(s => s.label);
+  state.Xtest = shuffled.slice(splitIdx).map(s => s.features);
+  state.ytest = shuffled.slice(splitIdx).map(s => s.label);
 }
 
 function computeStats(X) {
@@ -124,8 +143,10 @@ function standardize(X, means, stds) {
 
 async function trainModel() {
   if (state.training) return;
+
   state.training = true;
   trainBtn.disabled = true;
+  animate(trainBtn, { scale: [1, 0.95, 1] }, { duration: 0.25 });
   trainingOverlay.classList.add('active');
   panelMetrics.style.display = 'none';
   panelPredict.style.display = 'none';
@@ -197,11 +218,20 @@ async function trainModel() {
 
   drawBoundary();
   showMetrics();
+
   panelMetrics.style.display = 'block';
   panelPredict.style.display = 'block';
 
-  animate(panelMetrics, { opacity: [0, 1], y: [16, 0] }, { duration: 0.4, easing: [0.25, 0.1, 0.25, 1] });
-  animate(panelPredict, { opacity: [0, 1], y: [16, 0] }, { duration: 0.4, easing: [0.25, 0.1, 0.25, 1] });
+  // Entrance animation for metrics & prediction
+  animate(panelMetrics, { opacity: [0, 1], y: [20, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1] });
+  animate(panelPredict, { opacity: [0, 1], y: [20, 0] }, { duration: 0.45, easing: [0.22, 0.03, 0.26, 1], delay: 0.08 });
+
+  // Stagger metric cards
+  animate('.metric-card', { opacity: [0, 1], y: [12, 0], scale: [0.95, 1] }, {
+    duration: 0.35,
+    easing: [0.22, 0.03, 0.26, 1],
+    delay: stagger(0.07, { start: 0.3 })
+  });
 }
 
 function showMetrics() {
@@ -214,10 +244,10 @@ function showMetrics() {
   const f1 = f1Score(state.ytest, preds);
   const cm = confusionMatrix(state.ytest, preds);
 
-  metricAccuracy.textContent = acc.toFixed(3);
-  metricPrecision.textContent = prec.toFixed(3);
-  metricRecall.textContent = rec.toFixed(3);
-  metricF1.textContent = f1.toFixed(3);
+  animateNumber(metricAccuracy, acc);
+  animateNumber(metricPrecision, prec);
+  animateNumber(metricRecall, rec);
+  animateNumber(metricF1, f1);
 
   cmTN.textContent = cm.tn;
   cmFP.textContent = cm.fp;
@@ -230,7 +260,12 @@ function showMetrics() {
 
   const fn = state.dataset.featureNames;
   coeffFormula.innerHTML = `ŷ = σ(${state.model.bias.toFixed(3)} + ${state.model.weights[0].toFixed(3)}·${fn[0]} + ${state.model.weights[1].toFixed(3)}·${fn[1]})`;
+
+  // Pulse animation on confusion cells
+  animate('.cm-cell', { scale: [0.9, 1.05, 1] }, { duration: 0.4, easing: [0.22, 0.03, 0.26, 1], delay: 0.4 });
 }
+
+// ── Canvas: Decision Boundary ──────────────────
 
 function drawBoundary() {
   const W = 500, H = 400;
@@ -257,6 +292,7 @@ function drawBoundary() {
   function toX(v) { return pad + (v - xMin) * sx; }
   function toY(v) { return H - pad - (v - yMin) * sy; }
 
+  // Probability heatmap
   if (state.model && state.model.trained) {
     const res = 2;
     for (let px = 0; px < W; px += res) {
@@ -305,10 +341,10 @@ function drawBoundary() {
     const cx = toX(s.features[0]);
     const cy = toY(s.features[1]);
     const color = state.colors[s.label];
-    const r = s.label === 0 ? 5 : 5;
+    const r = 5;
 
     bCtx.shadowColor = color;
-    bCtx.shadowBlur = 6;
+    bCtx.shadowBlur = 8;
     bCtx.fillStyle = color;
     bCtx.beginPath();
     bCtx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -321,7 +357,7 @@ function drawBoundary() {
   }
 
   // Axis labels
-  bCtx.fillStyle = 'rgba(255,255,255,0.25)';
+  bCtx.fillStyle = 'rgba(255,255,255,0.2)';
   bCtx.font = '10px Inter, sans-serif';
   bCtx.textAlign = 'center';
   bCtx.textBaseline = 'top';
@@ -337,7 +373,7 @@ function drawBoundary() {
   }
 
   bCtx.fillStyle = 'rgba(255,255,255,0.3)';
-  bCtx.font = '10px Inter, sans-serif';
+  bCtx.font = '11px Inter, sans-serif';
   bCtx.textAlign = 'left';
   bCtx.textBaseline = 'bottom';
   bCtx.fillText(featureNames[0], W - pad, toY(0) - 2);
@@ -345,6 +381,8 @@ function drawBoundary() {
   bCtx.textBaseline = 'bottom';
   bCtx.fillText(featureNames[1], toX(0), pad - 2);
 }
+
+// ── Canvas: Cost Chart ─────────────────────────
 
 function drawCostChart(costHistory) {
   const W = 500, H = 300;
@@ -376,20 +414,20 @@ function drawCostChart(costHistory) {
 
   // Fill under curve
   cCtx.beginPath();
-  cCtx.moveTo(toCx(0), toCy(0));
+  cCtx.moveTo(toCx(0), H - pad);
   for (let i = 0; i < costHistory.length; i++) {
     cCtx.lineTo(toCx(i), toCy(costHistory[i]));
   }
-  cCtx.lineTo(toCx(xMaxE), toCy(0));
+  cCtx.lineTo(toCx(xMaxE), H - pad);
   cCtx.closePath();
-  cCtx.fillStyle = 'rgba(124, 58, 237, 0.1)';
+  cCtx.fillStyle = 'rgba(135, 91, 247, 0.08)';
   cCtx.fill();
 
-  // Cost curve
-  cCtx.strokeStyle = '#7c3aed';
+  // Curve
+  cCtx.strokeStyle = '#875bf7';
   cCtx.lineWidth = 2;
-  cCtx.shadowColor = '#7c3aed';
-  cCtx.shadowBlur = 8;
+  cCtx.shadowColor = '#875bf7';
+  cCtx.shadowBlur = 10;
   cCtx.beginPath();
   for (let i = 0; i < costHistory.length; i++) {
     if (i === 0) cCtx.moveTo(toCx(i), toCy(costHistory[i]));
@@ -399,7 +437,7 @@ function drawCostChart(costHistory) {
   cCtx.shadowBlur = 0;
 
   // Labels
-  cCtx.fillStyle = 'rgba(255,255,255,0.25)';
+  cCtx.fillStyle = 'rgba(255,255,255,0.22)';
   cCtx.font = '10px Inter, sans-serif';
   cCtx.textAlign = 'right';
   cCtx.textBaseline = 'middle';
@@ -411,9 +449,12 @@ function drawCostChart(costHistory) {
   cCtx.fillText('0', pad, H - pad + 6);
 }
 
-// Prediction
+// ── Prediction ─────────────────────────────────
+
 function predict() {
   if (!state.model || !state.model.trained) return;
+
+  animate(predictBtn, { scale: [1, 0.95, 1] }, { duration: 0.2 });
 
   const f1 = parseFloat(predF1.value);
   const f2 = parseFloat(predF2.value);
@@ -436,9 +477,12 @@ function predict() {
       <div class="result-prob">Probabilidad: <span>${(prob >= 0.5 ? prob : 1 - prob).toFixed(1)}%</span></div>
     </div>
   `;
+
+  animate(predictResult, { scale: [0.96, 1], opacity: [0, 1] }, { duration: 0.3, easing: [0.22, 0.03, 0.26, 1] });
 }
 
-// Event listeners
+// ── Event listeners ────────────────────────────
+
 datasetSelect.addEventListener('change', updateDataset);
 trainSplit.addEventListener('input', () => {
   trainSplitLabel.textContent = trainSplit.value;
@@ -459,6 +503,7 @@ resetBtn.addEventListener('click', () => {
 });
 predictBtn.addEventListener('click', predict);
 
-// Init
+// ── Init ───────────────────────────────────────
+
 updateDataset();
 drawCostChart([]);
